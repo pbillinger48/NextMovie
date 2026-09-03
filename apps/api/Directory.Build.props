@@ -1,0 +1,27 @@
+<Project>
+
+  <!--
+    Shared MSBuild settings for every project under apps/api, so individual
+    .csproj files stay focused on their own dependencies.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      Warnings fail the build. This is stricter than usual for a reason: ADR-0002
+      generates the TypeScript client from this API's OpenAPI schema, so inaccurate
+      C# nullability becomes inaccurate TypeScript that still compiles. Nullability
+      warnings here are contract bugs, not style nits.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- XML doc comments flow into the OpenAPI document as descriptions... -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- ...but a doc comment is not required on every public member. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

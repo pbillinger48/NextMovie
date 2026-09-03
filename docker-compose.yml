@@ -1,0 +1,44 @@
+# Local development infrastructure for NextMovie.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+#
+# The host port is 5433 (not the default 5432) so this instance coexists with a
+# Homebrew PostgreSQL service already running on this machine. Inside the
+# compose network the container still listens on 5432.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: nextmovie-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nextmovie}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-nextmovie}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # Mount at /var/lib/postgresql, NOT /var/lib/postgresql/data.
+      # Postgres 18+ images store data in major-version-specific subdirectories
+      # (/var/lib/postgresql/18/docker) so `pg_upgrade --link` works within one
+      # mount point. Mounting the old pre-18 `/data` path makes the image refuse
+      # to start. See https://github.com/docker-library/postgres/pull/1259
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # EF Core migrations will race the database on a cold start without this.
+      # Dependents can gate on `condition: service_healthy` rather than sleeping.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-nextmovie} -d ${POSTGRES_DB:-nextmovie}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:
+    name: nextmovie-postgres-data

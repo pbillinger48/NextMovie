@@ -1,0 +1,20 @@
+{
+  "name": "nextmovie",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Movie discovery and recommendation platform",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.12"
+  }
+}

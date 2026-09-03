@@ -1,0 +1,9 @@
+@NextMovie.Api_HostAddress = http://localhost:5080
+
+### Liveness probe
+GET {{NextMovie.Api_HostAddress}}/api/v1/health
+Accept: application/json
+
+### OpenAPI document (Development only) — source of truth for the generated TS client
+GET {{NextMovie.Api_HostAddress}}/openapi/v1.json
+Accept: application/json
