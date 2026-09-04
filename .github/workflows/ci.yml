@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref, so a quick follow-up push does not
+# queue behind a run whose result no longer matters.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: CI only needs to read the repository.
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API (.NET)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Read the SDK version from global.json so CI and local development cannot
+      # drift apart. Bumping the pin in one place updates both.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore apps/api/NextMovie.slnx
+
+      # Release configuration, and TreatWarningsAsErrors is on (see
+      # apps/api/Directory.Build.props) — a new warning fails the build here.
+      - name: Build
+        run: dotnet build apps/api/NextMovie.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test apps/api/NextMovie.slnx --configuration Release --no-build
+
+  web:
+    name: Web (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Must run before setup-node so that `cache: pnpm` can find pnpm.
+      # The version comes from the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v6
+
+      # Node version comes from .nvmrc, same single-source reasoning as
+      # global.json above.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # --frozen-lockfile fails when pnpm-lock.yaml is out of date rather than
+      # silently resolving different versions than a developer has locally.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+  # TODO (ADR-0002): once the TypeScript client is generated from the OpenAPI
+  # schema, add a job that regenerates it and fails if the committed output
+  # differs. Without that check, generation is a convention rather than a
+  # guarantee, and the contract can drift silently.
