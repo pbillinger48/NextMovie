@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Hosting;
 using NextMovie.Api.Features.Health;
 
 namespace NextMovie.Api.Tests.Features.Health;
@@ -19,7 +21,11 @@ public sealed class GetHealthTests : IClassFixture<WebApplicationFactory<Program
 {
     private readonly WebApplicationFactory<Program> _factory;
 
-    public GetHealthTests(WebApplicationFactory<Program> factory) => _factory = factory;
+    // Pinned to Development so the host resolves the connection string from
+    // appsettings.Development.json. The endpoint itself never touches the
+    // database, but the application still builds its service container on boot.
+    public GetHealthTests(WebApplicationFactory<Program> factory) =>
+        _factory = factory.WithWebHostBuilder(b => b.UseEnvironment(Environments.Development));
 
     [Fact]
     public async Task Returns_ok_with_healthy_status()

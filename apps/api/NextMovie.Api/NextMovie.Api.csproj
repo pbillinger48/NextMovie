@@ -3,7 +3,23 @@
   <!-- Common properties live in ../Directory.Build.props -->
 
   <ItemGroup>
+    <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+
+    <!--
+      Pinned explicitly, though both arrive transitively. Microsoft.EntityFrameworkCore.Design
+      is PrivateAssets=all, so it raises EF Core to 10.0.11 inside this project but does not
+      flow to referencing projects. Consumers (NextMovie.Api.Tests) would otherwise resolve
+      10.0.4 via Npgsql/NamingConventions while linking an assembly built against 10.0.11 —
+      an MSB3277 conflict that becomes a runtime TypeLoadException under TreatWarningsAsErrors.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 
 </Project>
