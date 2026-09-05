@@ -19,6 +19,7 @@ haven't seen that they can stream right now.
 | [API](docs/api.md) | Endpoint reference |
 | [Roadmap](docs/roadmap.md) | Phased delivery plan |
 | **[ADRs](docs/adr/)** | **Architecture decisions and their rationale** |
+| [Spikes](docs/spikes/) | Time-boxed investigations and what they found |
 
 > The documents in `docs/` were written before any code and contain known
 > inaccuracies. Where an ADR conflicts with `docs/`, **the ADR is authoritative**.
