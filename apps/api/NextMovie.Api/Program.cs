@@ -1,9 +1,11 @@
 using System.Net.Http.Headers;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NextMovie.Api.Features.Health;
 using NextMovie.Api.Features.Movies;
 using NextMovie.Api.Infrastructure.ErrorHandling;
+using NextMovie.Api.Infrastructure.OpenApi;
 using NextMovie.Api.Infrastructure.Persistence;
 using NextMovie.Api.Infrastructure.Tmdb;
 
@@ -39,11 +41,21 @@ builder.Services.AddScoped<MovieCatalog>();
 // Bound and validated at startup rather than on first use: a missing TMDb token
 // should stop the process immediately with a clear message, not surface as a
 // confusing 401 the first time somebody searches.
-builder.Services
+var tmdbOptions = builder.Services
     .AddOptions<TmdbOptions>()
     .Bind(builder.Configuration.GetSection(TmdbOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
+    .ValidateDataAnnotations();
+
+// ...with one exception. The build-time OpenAPI generator (GetDocument.Insider,
+// see OpenApiGenerateDocumentsOnBuild in the csproj) starts the host in-process
+// to read endpoint metadata. It has no secrets and needs none, so startup
+// validation would fail `dotnet build` on a correctly configured machine and
+// make the schema unbuildable in CI. Only that context is exempt; every run
+// that actually serves traffic still validates.
+if (Assembly.GetEntryAssembly()?.GetName().Name != "GetDocument.Insider")
+{
+    tmdbOptions.ValidateOnStart();
+}
 
 builder.Services.AddHttpClient<ITmdbClient, TmdbClient>((serviceProvider, client) =>
     {
@@ -63,7 +75,8 @@ builder.Services.AddHttpClient<ITmdbClient, TmdbClient>((serviceProvider, client
 // documented in docs/api.md.
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<TmdbExceptionHandler>();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+    options.AddSchemaTransformer<NumericTypeSchemaTransformer>());
 
 var app = builder.Build();
 

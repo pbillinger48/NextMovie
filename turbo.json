@@ -17,6 +17,10 @@
     },
     "test": {
       "dependsOn": ["^build"]
+    },
+    "generate": {
+      "inputs": ["NextMovie.Api.json"],
+      "outputs": ["src/schema.d.ts"]
     }
   }
 }

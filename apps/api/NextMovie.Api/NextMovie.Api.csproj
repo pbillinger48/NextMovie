@@ -1,7 +1,21 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup>  <UserSecretsId>be5af9c8-ec18-48b3-897e-e06a7332b1c8</UserSecretsId>
-  </PropertyGroup>
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <!-- Common properties live in ../Directory.Build.props -->
+
+  <PropertyGroup>
+    <UserSecretsId>be5af9c8-ec18-48b3-897e-e06a7332b1c8</UserSecretsId>
+
+    <!--
+      Emit the OpenAPI document to packages/api-client during build.
+
+      ADR-0002 makes this schema the single source of truth for the TypeScript
+      client. Generating it at build time rather than scraping /openapi/v1.json
+      from a running server means CI can verify the contract without booting the
+      API or a database — which is what lets the drift check be a hard gate.
+    -->
+    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/../../../packages/api-client</OpenApiDocumentsDirectory>
+  </PropertyGroup>
 
   <ItemGroup>
     <!--
@@ -26,6 +40,10 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.11">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
