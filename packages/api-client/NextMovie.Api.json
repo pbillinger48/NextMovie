@@ -1,0 +1,269 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "NextMovie.Api | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "GetHealth"
+        ],
+        "summary": "Liveness probe",
+        "description": "Reports whether the API process is running and serving requests.",
+        "operationId": "GetHealth",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/movies/search": {
+      "get": {
+        "tags": [
+          "SearchMovies"
+        ],
+        "summary": "Search films by title",
+        "description": "Searches TMDb by title, stores the results in the NextMovie catalogue, and returns them ranked by relevance.",
+        "operationId": "SearchMovies",
+        "parameters": [
+          {
+            "name": "title",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchMoviesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "required": [
+          "status",
+          "version",
+          "timestampUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `healthy` when the process is serving requests."
+          },
+          "version": {
+            "type": "string",
+            "description": "Informational assembly version of the running build."
+          },
+          "timestampUtc": {
+            "type": "string",
+            "description": "Server time at which the probe was answered.",
+            "format": "date-time"
+          }
+        },
+        "description": "Response body returned by the health endpoint."
+      },
+      "HttpValidationProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "MovieSummary": {
+        "required": [
+          "id",
+          "tmdbId",
+          "title",
+          "overview",
+          "posterPath",
+          "releaseDate",
+          "averageRating",
+          "genres"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "NextMovie identifier. Stable, and the one clients should store.",
+            "format": "uuid"
+          },
+          "tmdbId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "TMDb identifier, exposed for attribution and deep links.",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title."
+          },
+          "overview": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Synopsis, when TMDb has one."
+          },
+          "posterPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Relative TMDb poster path; combine with a TMDb image base URL to render."
+          },
+          "releaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Release date, when known.",
+            "format": "date"
+          },
+          "averageRating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "TMDb community rating 0–10. Null when the film has no votes.",
+            "format": "double"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Genre names, alphabetically."
+          }
+        },
+        "description": "Summary view of a film."
+      },
+      "SearchMoviesResponse": {
+        "required": [
+          "page",
+          "totalPages",
+          "totalResults",
+          "results"
+        ],
+        "type": "object",
+        "properties": {
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "The page returned.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Total pages available for this query.",
+            "format": "int32"
+          },
+          "totalResults": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Total matching films.",
+            "format": "int32"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MovieSummary"
+            },
+            "description": "Films on this page, ordered by relevance."
+          }
+        },
+        "description": "A page of search results."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "GetHealth"
+    },
+    {
+      "name": "SearchMovies"
+    }
+  ]
+}

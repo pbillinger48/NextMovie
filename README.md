@@ -112,11 +112,22 @@ Prefer the v4 **API Read Access Token** (a bearer JWT) over the v3 `api_key`.
 > API but is not endorsed or certified by TMDB."* This must appear in the web and
 > mobile clients — it is an obligation, not a courtesy.
 
-## Trying the API
+## Running the app
+
+Two processes, in separate terminals:
 
 ```bash
+# API — http://localhost:5080
 dotnet run --project apps/api/NextMovie.Api
 
+# Web — http://localhost:3000
+pnpm --filter @nextmovie/web dev
+```
+
+Then open <http://localhost:3000> and search for a film.
+
+```bash
+# Or drive the API directly
 curl "http://localhost:5080/api/v1/health"
 curl "http://localhost:5080/api/v1/movies/search?title=arrival"
 ```
@@ -125,22 +136,55 @@ Search is **read-through**: results come from TMDb, are written into the local
 catalogue, and are returned from NextMovie's own model — so responses carry
 NextMovie identifiers, and the catalogue grows as people search.
 
+The browser never calls the API directly. Search runs in a React Server
+Component, so there is no CORS configuration and no API URL in client code
+(ADR-0001).
+
+## The API contract
+
+Per [ADR-0002](docs/adr/0002-generate-typescript-from-openapi.md), TypeScript
+types are **generated** from the API's OpenAPI schema and never hand-written.
+
+```
+C# endpoints + DTOs
+        │  dotnet build   (OpenApiGenerateDocumentsOnBuild)
+        ▼
+packages/api-client/NextMovie.Api.json
+        │  pnpm generate  (openapi-typescript)
+        ▼
+packages/api-client/src/schema.d.ts
+        │
+        ▼
+     apps/web
+```
+
+Both artefacts are committed, so a fresh clone type-checks without a running
+API. After changing any endpoint or DTO:
+
+```bash
+dotnet build apps/api/NextMovie.Api   # rewrites the OpenAPI document
+pnpm generate                          # rewrites the TypeScript types
+```
+
+CI runs both and **fails if the committed output differs** — which is what makes
+this a guarantee rather than a habit.
+
 ## Repository layout
 
 ```
 apps/
-  web/        Next.js web application
-  api/        ASP.NET Core API
-  mobile/     Expo app (planned)
+  web/          Next.js web application
+  api/          ASP.NET Core API
+  mobile/       Expo app (planned)
 packages/
-  shared-types/   Types not owned by the API contract (see ADR-0002)
-  shared-utils/   Shared utilities
+  api-client/   OpenAPI document + generated TypeScript client
 docs/
-  adr/        Architecture Decision Records
+  adr/          Architecture Decision Records
 ```
 
-`apps/` and `packages/` are currently empty — they are populated as the walking
-skeleton is built.
+`apps/mobile` is not scaffolded yet. There is deliberately no `shared-types`
+package: the API contract is generated (ADR-0002), and a hand-written duplicate
+would be free to drift from it.
 
 ## Scripts
 

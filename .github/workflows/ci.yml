@@ -71,7 +71,42 @@ jobs:
       - name: Build
         run: pnpm build
 
-  # TODO (ADR-0002): once the TypeScript client is generated from the OpenAPI
-  # schema, add a job that regenerates it and fails if the committed output
-  # differs. Without that check, generation is a convention rather than a
-  # guarantee, and the contract can drift silently.
+  # ADR-0002's enforcement. Without this job, "generate the TypeScript from the
+  # schema" is a convention someone can forget; with it, a backend change that
+  # alters the contract cannot merge unless the schema and client are regenerated
+  # alongside it. This is the difference between a guarantee and a habit.
+  contract:
+    name: API contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Building the API rewrites packages/api-client/NextMovie.Api.json via
+      # OpenApiGenerateDocumentsOnBuild. No database or TMDb token required.
+      - name: Regenerate OpenAPI document
+        run: dotnet build apps/api/NextMovie.Api --configuration Release
+
+      - name: Regenerate TypeScript client
+        run: pnpm generate
+
+      - name: Fail if the committed contract is stale
+        run: |
+          if ! git diff --exit-code -- packages/api-client; then
+            echo "::error::The committed OpenAPI document or generated TypeScript client is out of date."
+            echo "::error::Run 'dotnet build apps/api/NextMovie.Api && pnpm generate' and commit the result."
+            exit 1
+          fi

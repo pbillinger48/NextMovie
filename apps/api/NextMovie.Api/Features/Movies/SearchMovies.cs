@@ -109,8 +109,14 @@ public static class SearchMovies
 /// <param name="Title">Title to search for.</param>
 /// <param name="Page">1-based page number. Defaults to 1.</param>
 public sealed record SearchMoviesRequest(
-    [FromQuery] string? Title,
-    [FromQuery] int? Page);
+    // Names are set explicitly. Without them the parameters are published as
+    // `Title` and `Page` (the C# property names), which contradicts
+    // docs/api.md and normal REST convention. ASP.NET Core's query binding is
+    // case-insensitive, so `?title=` would still work at runtime and the
+    // mismatch would only ever surface in the generated client — which is
+    // precisely where it did surface.
+    [FromQuery(Name = "title")] string? Title,
+    [FromQuery(Name = "page")] int? Page);
 
 /// <summary>A page of search results.</summary>
 /// <param name="Page">The page returned.</param>
