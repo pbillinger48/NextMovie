@@ -1,6 +1,16 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup>  <UserSecretsId>be5af9c8-ec18-48b3-897e-e06a7332b1c8</UserSecretsId>
+  </PropertyGroup>
 
   <!-- Common properties live in ../Directory.Build.props -->
+
+  <ItemGroup>
+    <!--
+      TMDb DTOs, the mapper and MovieCatalog are internal so the anti-corruption
+      boundary is enforced by the compiler rather than by convention. Tests still
+      need to reach them, which is exactly what this is for.
+    -->
+    <InternalsVisibleTo Include="NextMovie.Api.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
@@ -19,6 +29,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 
