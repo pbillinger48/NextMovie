@@ -58,10 +58,41 @@ docker compose up -d
 
 # 5. Verify the database is healthy
 docker compose ps
+
+# 6. Restore local .NET tools (pins dotnet-ef to the version this repo expects)
+dotnet tool restore
+
+# 7. Apply database migrations
+dotnet ef database update --project apps/api/NextMovie.Api
 ```
 
 PostgreSQL is published on **port 5433**, not the default 5432, so it coexists
 with a Homebrew PostgreSQL service. See [`.env.example`](.env.example).
+
+## Database migrations
+
+Migrations are **never applied automatically**. Running DDL from application
+startup races across instances during a rolling deploy, ships schema changes
+unreviewed, and requires the application to hold permanent DDL permissions.
+
+```bash
+# Apply pending migrations locally
+dotnet ef database update --project apps/api/NextMovie.Api
+
+# Add a migration after changing an entity or its configuration
+dotnet ef migrations add <Name> \
+  --project apps/api/NextMovie.Api \
+  --output-dir Infrastructure/Persistence/Migrations
+
+# Undo the most recent migration (only if it has NOT been applied or pushed)
+dotnet ef migrations remove --project apps/api/NextMovie.Api
+
+# Review the SQL rather than trusting the tool
+dotnet ef migrations script --project apps/api/NextMovie.Api --idempotent
+```
+
+For deployed environments, generate an idempotent script, review it, and let the
+deploy pipeline apply it — the application itself never runs migrations.
 
 ### TMDb credentials
 

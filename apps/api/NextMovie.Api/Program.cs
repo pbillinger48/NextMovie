@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using NextMovie.Api.Features.Health;
+using NextMovie.Api.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +20,14 @@ else
 {
     builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 }
+
+// PostgreSQL via EF Core. Snake-case naming keeps identifiers in PostgreSQL's
+// native style (movies.tmdb_id), so hand-written SQL and psql sessions never
+// need to quote them. Migrations are never applied automatically — see the
+// README; running DDL from application startup races across instances on deploy.
+builder.Services.AddDbContext<NextMovieDbContext>(options => options
+    .UseNpgsql(builder.Configuration.GetConnectionString("NextMovieDb"))
+    .UseSnakeCaseNamingConvention());
 
 // RFC 7807 ProblemDetails for every error response, matching the error format
 // documented in docs/api.md.
