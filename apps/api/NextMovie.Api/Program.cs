@@ -1,6 +1,11 @@
+using System.Net.Http.Headers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NextMovie.Api.Features.Health;
+using NextMovie.Api.Features.Movies;
+using NextMovie.Api.Infrastructure.ErrorHandling;
 using NextMovie.Api.Infrastructure.Persistence;
+using NextMovie.Api.Infrastructure.Tmdb;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,9 +34,35 @@ builder.Services.AddDbContext<NextMovieDbContext>(options => options
     .UseNpgsql(builder.Configuration.GetConnectionString("NextMovieDb"))
     .UseSnakeCaseNamingConvention());
 
+builder.Services.AddScoped<MovieCatalog>();
+
+// Bound and validated at startup rather than on first use: a missing TMDb token
+// should stop the process immediately with a clear message, not surface as a
+// confusing 401 the first time somebody searches.
+builder.Services
+    .AddOptions<TmdbOptions>()
+    .Bind(builder.Configuration.GetSection(TmdbOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddHttpClient<ITmdbClient, TmdbClient>((serviceProvider, client) =>
+    {
+        var options = serviceProvider.GetRequiredService<IOptions<TmdbOptions>>().Value;
+
+        client.BaseAddress = new Uri(options.BaseUrl);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", options.ApiReadAccessToken);
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    })
+    // Timeout, retry with exponential backoff and jitter, and a circuit breaker.
+    // The breaker matters most: without it, a TMDb outage means every request
+    // retries into an already-failing service and we amplify their incident.
+    .AddStandardResilienceHandler();
+
 // RFC 7807 ProblemDetails for every error response, matching the error format
 // documented in docs/api.md.
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<TmdbExceptionHandler>();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -49,6 +80,7 @@ if (app.Environment.IsDevelopment())
 // Feature slices register themselves explicitly. Reflection-based endpoint
 // discovery would be shorter, but this stays greppable and has no startup magic.
 GetHealth.Map(app);
+SearchMovies.Map(app);
 
 app.Run();
 

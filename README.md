@@ -105,6 +105,25 @@ dotnet user-secrets set "Tmdb:ApiReadAccessToken" "<your-v4-token>"
 ```
 
 Get a free token at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
+Prefer the v4 **API Read Access Token** (a bearer JWT) over the v3 `api_key`.
+
+> **Attribution is required.** TMDb's terms of use require any product built on
+> their API to display their logo and the statement *"This product uses the TMDB
+> API but is not endorsed or certified by TMDB."* This must appear in the web and
+> mobile clients — it is an obligation, not a courtesy.
+
+## Trying the API
+
+```bash
+dotnet run --project apps/api/NextMovie.Api
+
+curl "http://localhost:5080/api/v1/health"
+curl "http://localhost:5080/api/v1/movies/search?title=arrival"
+```
+
+Search is **read-through**: results come from TMDb, are written into the local
+catalogue, and are returned from NextMovie's own model — so responses carry
+NextMovie identifiers, and the catalogue grows as people search.
 
 ## Repository layout
 
