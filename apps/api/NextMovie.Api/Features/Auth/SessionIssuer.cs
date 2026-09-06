@@ -30,7 +30,7 @@ internal sealed class SessionIssuer(
     /// Rotation chain to continue, or null to start a new one. A fresh sign-in
     /// starts a family; a refresh continues the presented token's.
     /// </param>
-    public AuthenticationResponse Issue(User user, Guid? familyId = null)
+    public IssuedSession Issue(User user, Guid? familyId = null)
     {
         var accessToken = accessTokens.Issue(user);
         var refreshToken = refreshTokens.Create(user.Id, familyId);
@@ -45,11 +45,24 @@ internal sealed class SessionIssuer(
         // graph is new) worked fine.
         db.RefreshTokens.Add(refreshToken.Entity);
 
-        return new AuthenticationResponse(
-            AccessToken: accessToken.Value,
-            AccessTokenExpiresAt: accessToken.ExpiresAt,
-            RefreshToken: refreshToken.Value,
-            RefreshTokenExpiresAt: refreshToken.Entity.ExpiresAt,
-            User: AuthenticatedUser.From(user));
+        return new IssuedSession(
+            new AuthenticationResponse(
+                AccessToken: accessToken.Value,
+                AccessTokenExpiresAt: accessToken.ExpiresAt,
+                RefreshToken: refreshToken.Value,
+                RefreshTokenExpiresAt: refreshToken.Entity.ExpiresAt,
+                User: AuthenticatedUser.From(user)),
+            refreshToken.Entity);
     }
 }
+
+/// <summary>A session, and the refresh token row backing it.</summary>
+/// <remarks>
+/// Register and login only need <paramref name="Response"/>. Rotation also needs
+/// the entity, so it can record on the outgoing token which token superseded it —
+/// without that link a revoked token is just revoked, and the chain that would
+/// show how a stolen token was used is lost.
+/// </remarks>
+/// <param name="Response">What the client receives.</param>
+/// <param name="RefreshToken">The row staged for insertion.</param>
+internal sealed record IssuedSession(AuthenticationResponse Response, RefreshToken RefreshToken);

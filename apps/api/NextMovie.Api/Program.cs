@@ -80,6 +80,7 @@ builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
 builder.Services.AddSingleton<RefreshTokenFactory>();
 builder.Services.AddScoped<SessionIssuer>();
+builder.Services.AddScoped<SessionRevoker>();
 
 // The API accepts bearer tokens and nothing else (ADR-0003). The browser's
 // session is a cookie held by the Next.js tier (ADR-0004), which the API is
@@ -134,6 +135,8 @@ GetHealth.Map(app);
 SearchMovies.Map(app);
 RegisterUser.Map(app);
 LoginUser.Map(app);
+RefreshSession.Map(app);
+LogoutUser.Map(app);
 
 app.Run();
 

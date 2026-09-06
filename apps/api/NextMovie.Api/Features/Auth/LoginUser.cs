@@ -136,7 +136,7 @@ public static class LoginUser
         var session = sessions.Issue(user);
         await db.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Ok(session);
+        return TypedResults.Ok(session.Response);
     }
 
     private static ProblemHttpResult InvalidCredentials() => TypedResults.Problem(

@@ -98,7 +98,7 @@ public static class RegisterUser
         // No Location header: there is no endpoint that serves a user by id yet.
         // Pointing at /api/v1/users/me would be wrong — it identifies whoever is
         // calling, not the account just created.
-        return TypedResults.Created((string?)null, session);
+        return TypedResults.Created((string?)null, session.Response);
     }
 
     private static ProblemHttpResult EmailAlreadyRegistered() => TypedResults.Problem(
