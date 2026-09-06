@@ -1,3 +1,5 @@
+using NextMovie.Api.Domain.Authentication;
+
 namespace NextMovie.Api.Domain;
 
 /// <summary>
@@ -68,12 +70,12 @@ public class User
     /// must survive process restarts — an attacker who could reset the counter
     /// by waiting for a deploy would defeat the point of having it.
     /// </remarks>
-    public int FailedLoginAttempts { get; set; }
+    public int FailedLoginAttempts { get; private set; }
 
     /// <summary>When the current lockout expires, or null when not locked out.</summary>
-    public DateTimeOffset? LockoutEndsAt { get; set; }
+    public DateTimeOffset? LockoutEndsAt { get; private set; }
 
-    public DateTimeOffset? LastLoginAt { get; set; }
+    public DateTimeOffset? LastLoginAt { get; private set; }
 
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
 
@@ -81,6 +83,53 @@ public class User
 
     /// <summary>Refresh tokens issued to this user, active and historical.</summary>
     public ICollection<RefreshToken> RefreshTokens { get; init; } = [];
+
+    /// <summary>
+    /// Whether sign-in is currently barred for this account.
+    /// </summary>
+    /// <remarks>
+    /// The lockout is read as "ends in the future", not as a flag, so it lapses
+    /// on its own with no scheduled job to clear it.
+    /// </remarks>
+    public bool IsLockedOut(DateTimeOffset now) => LockoutEndsAt > now;
+
+    /// <summary>
+    /// Records a failed sign-in attempt, locking the account once
+    /// <see cref="AuthenticationPolicy.MaxFailedLoginAttempts"/> is reached.
+    /// </summary>
+    /// <remarks>
+    /// The counter and the lockout window move together, which is why the
+    /// setters are private. A caller that incremented the count and forgot the
+    /// lockout would produce an account that can never be locked and never looks
+    /// wrong in the database.
+    /// </remarks>
+    public void RecordFailedLogin(DateTimeOffset now)
+    {
+        FailedLoginAttempts++;
+        UpdatedAt = now;
+
+        if (FailedLoginAttempts < AuthenticationPolicy.MaxFailedLoginAttempts)
+        {
+            return;
+        }
+
+        LockoutEndsAt = now + AuthenticationPolicy.LockoutDuration;
+
+        // The counter resets with the lockout, so the next window costs a full
+        // five attempts again. Leaving it at the maximum would mean one wrong
+        // password after the lockout lapsed re-locked the account immediately,
+        // which punishes the legitimate owner far more than an attacker.
+        FailedLoginAttempts = 0;
+    }
+
+    /// <summary>Records a successful sign-in, clearing any failure state.</summary>
+    public void RecordSuccessfulLogin(DateTimeOffset now)
+    {
+        FailedLoginAttempts = 0;
+        LockoutEndsAt = null;
+        LastLoginAt = now;
+        UpdatedAt = now;
+    }
 
     /// <summary>
     /// The single definition of email normalisation. Invariant culture, because

@@ -76,10 +76,181 @@
           }
         }
       }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "RegisterUser"
+        ],
+        "summary": "Create an account",
+        "description": "Creates a new account with an email and password, and returns an access token and refresh token for the new session.",
+        "operationId": "RegisterUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "LoginUser"
+        ],
+        "summary": "Sign in",
+        "description": "Exchanges an email and password for an access token and refresh token. Repeated failures temporarily lock the account.",
+        "operationId": "LoginUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AuthenticatedUser": {
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "profileImageUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "NextMovie user identifier.",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address, as the user entered it."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Name to show in the UI."
+          },
+          "profileImageUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Avatar URL, when one is set."
+          }
+        },
+        "description": "The account a session belongs to."
+      },
+      "AuthenticationResponse": {
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "refreshToken",
+          "refreshTokenExpiresAt",
+          "user"
+        ],
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Bearer token for API calls. Send as `Authorization: Bearer {token}`."
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "description": "When the access token stops being accepted.",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque token used to obtain a new access token. Store it as securely as a password."
+          },
+          "refreshTokenExpiresAt": {
+            "type": "string",
+            "description": "When the refresh token stops being exchangeable.",
+            "format": "date-time"
+          },
+          "user": {
+            "description": "The signed-in account.",
+            "$ref": "#/components/schemas/AuthenticatedUser"
+          }
+        },
+        "description": "A newly established session."
+      },
       "HealthResponse": {
         "required": [
           "status",
@@ -150,6 +321,30 @@
           }
         }
       },
+      "LoginUserRequest": {
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Email address the account was registered with. Case-insensitive."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The account's password."
+          }
+        },
+        "description": "Credentials presented at sign-in."
+      },
       "MovieSummary": {
         "required": [
           "id",
@@ -219,6 +414,75 @@
         },
         "description": "Summary view of a film."
       },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RegisterUserRequest": {
+        "required": [
+          "email",
+          "displayName",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Email address. Must be unique, ignoring case."
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Name to show in the UI."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Chosen password. See PasswordPolicy for the rules."
+          }
+        },
+        "description": "Details needed to create an account."
+      },
       "SearchMoviesResponse": {
         "required": [
           "page",
@@ -264,6 +528,12 @@
     },
     {
       "name": "SearchMovies"
+    },
+    {
+      "name": "RegisterUser"
+    },
+    {
+      "name": "LoginUser"
     }
   ]
 }

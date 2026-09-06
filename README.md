@@ -95,15 +95,23 @@ dotnet ef migrations script --project apps/api/NextMovie.Api --idempotent
 For deployed environments, generate an idempotent script, review it, and let the
 deploy pipeline apply it — the application itself never runs migrations.
 
-### TMDb credentials
+### API secrets
 
-TMDb credentials are **not** stored in `.env`. The API reads them via .NET
-user-secrets, which keeps them outside the repository directory entirely:
+Secrets are **not** stored in `.env`. The API reads them via .NET user-secrets,
+which keeps them outside the repository directory entirely:
 
 ```bash
 cd apps/api/NextMovie.Api
 dotnet user-secrets set "Tmdb:ApiReadAccessToken" "<your-v4-token>"
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)"
 ```
+
+Both are validated at startup, so the API will refuse to run without them rather
+than failing on the first request that needs one.
+
+`Jwt:SigningKey` signs access tokens with HS256 and must be at least 32
+characters. Treat it like the database password — anyone holding it can mint a
+token for any account — and use a distinct key per environment.
 
 Get a free token at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
 Prefer the v4 **API Read Access Token** (a bearer JWT) over the v3 `api_key`.

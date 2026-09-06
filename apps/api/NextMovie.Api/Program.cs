@@ -1,9 +1,14 @@
 using System.Net.Http.Headers;
 using System.Reflection;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using NextMovie.Api.Domain;
+using NextMovie.Api.Features.Auth;
 using NextMovie.Api.Features.Health;
 using NextMovie.Api.Features.Movies;
+using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.ErrorHandling;
 using NextMovie.Api.Infrastructure.OpenApi;
 using NextMovie.Api.Infrastructure.Persistence;
@@ -39,11 +44,16 @@ builder.Services.AddDbContext<NextMovieDbContext>(options => options
 builder.Services.AddScoped<MovieCatalog>();
 
 // Bound and validated at startup rather than on first use: a missing TMDb token
-// should stop the process immediately with a clear message, not surface as a
-// confusing 401 the first time somebody searches.
+// or signing key should stop the process immediately with a clear message, not
+// surface as a confusing 401 the first time somebody searches or signs in.
 var tmdbOptions = builder.Services
     .AddOptions<TmdbOptions>()
     .Bind(builder.Configuration.GetSection(TmdbOptions.SectionName))
+    .ValidateDataAnnotations();
+
+var jwtOptions = builder.Services
+    .AddOptions<JwtOptions>()
+    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
     .ValidateDataAnnotations();
 
 // ...with one exception. The build-time OpenAPI generator (GetDocument.Insider,
@@ -55,7 +65,28 @@ var tmdbOptions = builder.Services
 if (Assembly.GetEntryAssembly()?.GetName().Name != "GetDocument.Insider")
 {
     tmdbOptions.ValidateOnStart();
+    jwtOptions.ValidateOnStart();
 }
+
+// Injected rather than called statically so tests can move time forward without
+// waiting out a real lockout window.
+builder.Services.AddSingleton(TimeProvider.System);
+
+// Identity's PBKDF2 hasher, on its own. Registering the interface rather than
+// the concrete type keeps the option of swapping the algorithm open, which is
+// the whole reason ADR-0003 requires a versioned hash format.
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+
+builder.Services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
+builder.Services.AddSingleton<RefreshTokenFactory>();
+builder.Services.AddScoped<SessionIssuer>();
+
+// The API accepts bearer tokens and nothing else (ADR-0003). The browser's
+// session is a cookie held by the Next.js tier (ADR-0004), which the API is
+// deliberately never taught about.
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+builder.Services.ConfigureOptions<ConfigureJwtBearerOptions>();
+builder.Services.AddAuthorization();
 
 builder.Services.AddHttpClient<ITmdbClient, TmdbClient>((serviceProvider, client) =>
     {
@@ -85,6 +116,13 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
+// No endpoint requires authentication yet — /users/me and the rest of the
+// authenticated surface land with the slices that need them. The middleware is
+// wired now so that tokens are validated by the same configuration that issues
+// them from the moment the first protected endpoint appears.
+app.UseAuthentication();
+app.UseAuthorization();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -94,6 +132,8 @@ if (app.Environment.IsDevelopment())
 // discovery would be shorter, but this stays greppable and has no startup magic.
 GetHealth.Map(app);
 SearchMovies.Map(app);
+RegisterUser.Map(app);
+LoginUser.Map(app);
 
 app.Run();
 

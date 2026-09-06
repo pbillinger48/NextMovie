@@ -28,6 +28,18 @@
 
   <ItemGroup>
     <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
+    <!--
+      Token validation, per ADR-0003: verifying a JWT signature is a
+      cryptographic operation and is exactly the line that ADR says not to
+      cross by hand. Issuing uses Microsoft.IdentityModel.JsonWebTokens, which
+      arrives with this package.
+
+      PasswordHasher<T> needs no reference at all — Microsoft.Extensions.Identity.Core
+      is part of the ASP.NET Core shared framework. Notably this is NOT
+      Microsoft.AspNetCore.Identity.EntityFrameworkCore, which is what would
+      bring the AspNet* tables ADR-0003 rejects.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
 
     <!--

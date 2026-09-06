@@ -26,9 +26,9 @@
 
 ## Phase 2 - Authentication
 
-- [ ] Register
-- [ ] Login
-- [ ] JWT
+- [x] Register
+- [x] Login
+- [x] JWT
 - [ ] Google OAuth
 - [ ] User Profile
 
