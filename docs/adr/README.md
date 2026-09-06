@@ -20,6 +20,8 @@ Where an ADR and `docs/` disagree, **the ADR wins** — the product docs predate
 |---|---|---|
 | [0001](0001-nextjs-for-web-with-separate-api.md) | Next.js for web, with a separate ASP.NET Core API | Accepted |
 | [0002](0002-generate-typescript-from-openapi.md) | Generate TypeScript types from the OpenAPI schema | Accepted |
+| [0003](0003-own-auth-endpoints-with-identity-password-hashing.md) | Own authentication endpoints, using Identity's password hasher | Accepted |
+| [0004](0004-httponly-cookie-session-in-the-web-tier.md) | Keep the browser session in an httpOnly cookie held by Next.js | Accepted |
 
 ## Template
 
