@@ -44,10 +44,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an account
+         * @description Creates a new account with an email and password, and returns an access token and refresh token for the new session.
+         */
+        post: operations["RegisterUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in
+         * @description Exchanges an email and password for an access token and refresh token. Repeated failures temporarily lock the account.
+         */
+        post: operations["LoginUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The account a session belongs to. */
+        AuthenticatedUser: {
+            /**
+             * Format: uuid
+             * @description NextMovie user identifier.
+             */
+            id: string;
+            /** @description Email address, as the user entered it. */
+            email: string;
+            /** @description Name to show in the UI. */
+            displayName: string;
+            /** @description Avatar URL, when one is set. */
+            profileImageUrl: null | string;
+        };
+        /** @description A newly established session. */
+        AuthenticationResponse: {
+            /** @description Bearer token for API calls. Send as `Authorization: Bearer {token}`. */
+            accessToken: string;
+            /**
+             * Format: date-time
+             * @description When the access token stops being accepted.
+             */
+            accessTokenExpiresAt: string;
+            /** @description Opaque token used to obtain a new access token. Store it as securely as a password. */
+            refreshToken: string;
+            /**
+             * Format: date-time
+             * @description When the refresh token stops being exchangeable.
+             */
+            refreshTokenExpiresAt: string;
+            /** @description The signed-in account. */
+            user: components["schemas"]["AuthenticatedUser"];
+        };
         /** @description Response body returned by the health endpoint. */
         HealthResponse: {
             /** @description Always `healthy` when the process is serving requests. */
@@ -70,6 +143,13 @@ export interface components {
             errors?: {
                 [key: string]: string[];
             };
+        };
+        /** @description Credentials presented at sign-in. */
+        LoginUserRequest: {
+            /** @description Email address the account was registered with. Case-insensitive. */
+            email: null | string;
+            /** @description The account's password. */
+            password: null | string;
         };
         /** @description Summary view of a film. */
         MovieSummary: {
@@ -101,6 +181,23 @@ export interface components {
             averageRating: null | number;
             /** @description Genre names, alphabetically. */
             genres: string[];
+        };
+        ProblemDetails: {
+            type?: null | string;
+            title?: null | string;
+            /** Format: int32 */
+            status?: null | number;
+            detail?: null | string;
+            instance?: null | string;
+        };
+        /** @description Details needed to create an account. */
+        RegisterUserRequest: {
+            /** @description Email address. Must be unique, ignoring case. */
+            email: null | string;
+            /** @description Name to show in the UI. */
+            displayName: null | string;
+            /** @description Chosen password. See PasswordPolicy for the rules. */
+            password: null | string;
         };
         /** @description A page of search results. */
         SearchMoviesResponse: {
@@ -179,6 +276,90 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+        };
+    };
+    RegisterUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    LoginUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginUserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

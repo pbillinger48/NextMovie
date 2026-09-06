@@ -60,27 +60,81 @@ Future breaking changes will use:
 
 # Authentication
 
+Implemented per [ADR-0003](adr/0003-own-auth-endpoints-with-identity-password-hashing.md).
+The exact request and response schemas are generated from the API into
+`packages/api-client/NextMovie.Api.json`; that document is authoritative where
+this page disagrees with it.
+
 ## Register
 
-POST
+`POST /api/v1/auth/register`
 
-/api/v1/auth/register
+Creates an account and signs it in, so the client never has to follow
+registration with a second call carrying the password again.
 
-Creates a new account.
+```json
+{
+  "email": "parker@example.com",
+  "displayName": "Parker",
+  "password": "at least 12 characters"
+}
+```
+
+`201 Created` returns the same session body as login (below).
+
+| Status | When |
+|---|---|
+| `400` | Invalid email, missing display name, or a password outside 12–128 characters. |
+| `409` | An account already exists for that address, ignoring case. |
+
+The `409` does reveal that an address is registered. That is an accepted,
+documented exposure: the enumeration-resistant alternative is to answer `200`
+and send "you already have an account" by email, which needs a mailer that does
+not exist yet. Login leaks nothing.
 
 ---
 
 ## Login
 
-POST
+`POST /api/v1/auth/login`
 
-/api/v1/auth/login
+```json
+{
+  "email": "parker@example.com",
+  "password": "at least 12 characters"
+}
+```
 
-Returns:
+`200 OK`:
 
-- Access Token
-- Refresh Token
-- User
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "accessTokenExpiresAt": "2026-09-06T12:15:00+00:00",
+  "refreshToken": "0BFO4KMkr1cQ...",
+  "refreshTokenExpiresAt": "2026-10-06T12:00:00+00:00",
+  "user": {
+    "id": "0199...",
+    "email": "parker@example.com",
+    "displayName": "Parker",
+    "profileImageUrl": null
+  }
+}
+```
+
+The access token is a 15-minute JWT. The refresh token is an opaque 256-bit
+value, stored only as a SHA-256 hash, valid for 30 days.
+
+| Status | When |
+|---|---|
+| `400` | Email or password missing from the request. |
+| `401` | Wrong password, no such account, **or** the account is locked out. |
+
+The `401` is deliberately identical in all three cases, body included. Five
+consecutive failures lock an account for 15 minutes, and the lockout is checked
+before the password — so a correct password during a lockout still returns
+`401`, and the response never says the account is locked. Saying so would
+confirm the address exists.
 
 ---
 
@@ -90,7 +144,8 @@ POST
 
 /api/v1/auth/refresh
 
-Returns a new access token.
+Returns a new access token. **Not implemented yet.** Rotation and family
+revocation are specified in ADR-0003.
 
 ---
 
@@ -99,6 +154,8 @@ Returns a new access token.
 POST
 
 /api/v1/auth/logout
+
+**Not implemented yet.**
 
 ---
 
