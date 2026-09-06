@@ -26,6 +26,16 @@ public sealed class NextMovieApiFactory : WebApplicationFactory<Program>
     private const string UnusedConnectionString =
         "Host=127.0.0.1;Port=1;Database=nextmovie_unused;Username=test;Password=test";
 
+    /// <summary>
+    /// The JWT settings the test host runs with, exposed so a test can mint a
+    /// token this host would accept — or, more usefully, one it must reject.
+    /// </summary>
+    internal const string SigningKey = "test-signing-key-long-enough-for-hmac-sha256";
+
+    internal const string Issuer = "nextmovie-api-tests";
+
+    internal const string Audience = "nextmovie-tests";
+
     private readonly string _connectionString;
 
     /// <summary>Boots the API with no usable database.</summary>
@@ -59,9 +69,9 @@ public sealed class NextMovieApiFactory : WebApplicationFactory<Program>
                 // A fixed key so tokens are reproducible within a run. Long
                 // enough to satisfy the HS256 minimum, which startup validation
                 // enforces.
-                ["Jwt:SigningKey"] = "test-signing-key-long-enough-for-hmac-sha256",
-                ["Jwt:Issuer"] = "nextmovie-api-tests",
-                ["Jwt:Audience"] = "nextmovie-tests",
+                ["Jwt:SigningKey"] = SigningKey,
+                ["Jwt:Issuer"] = Issuer,
+                ["Jwt:Audience"] = Audience,
 
                 ["ConnectionStrings:NextMovieDb"] = _connectionString,
             });

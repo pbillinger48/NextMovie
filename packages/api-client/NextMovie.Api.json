@@ -267,6 +267,88 @@
           }
         }
       }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "tags": [
+          "GetCurrentUser"
+        ],
+        "summary": "Get the signed-in user's profile",
+        "description": "Returns the profile of the account the access token belongs to.",
+        "operationId": "GetCurrentUser",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "UpdateCurrentUser"
+        ],
+        "summary": "Update the signed-in user's profile",
+        "description": "Replaces the editable parts of the profile. Fields omitted from the request are cleared.",
+        "operationId": "UpdateCurrentUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCurrentUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -638,6 +720,68 @@
           }
         },
         "description": "A page of search results."
+      },
+      "UpdateCurrentUserRequest": {
+        "required": [
+          "displayName",
+          "profileImageUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Name to show in the UI. Required."
+          },
+          "profileImageUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Absolute http or https avatar URL. Omit or send null to clear it."
+          }
+        },
+        "description": "The new state of the editable profile."
+      },
+      "UserProfileResponse": {
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "profileImageUrl",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "NextMovie user identifier.",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address, as the user entered it."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Name shown in the UI."
+          },
+          "profileImageUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Avatar URL, when one is set."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the account was created.",
+            "format": "date-time"
+          }
+        },
+        "description": "A user's own profile."
       }
     }
   },
@@ -659,6 +803,12 @@
     },
     {
       "name": "LogoutUser"
+    },
+    {
+      "name": "GetCurrentUser"
+    },
+    {
+      "name": "UpdateCurrentUser"
     }
   ]
 }
