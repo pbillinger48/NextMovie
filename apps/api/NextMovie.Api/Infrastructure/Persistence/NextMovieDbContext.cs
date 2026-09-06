@@ -14,6 +14,10 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
 
     public DbSet<Genre> Genres => Set<Genre>();
 
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configurations are applied explicitly rather than via
@@ -21,6 +25,8 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
         // cost the ability to see, from here, exactly what shapes the model.
         modelBuilder.ApplyConfiguration(new MovieConfiguration());
         modelBuilder.ApplyConfiguration(new GenreConfiguration());
+        modelBuilder.ApplyConfiguration(new UserConfiguration());
+        modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }
