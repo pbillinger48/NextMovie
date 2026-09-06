@@ -140,22 +140,54 @@ confirm the address exists.
 
 ## Refresh Token
 
-POST
+`POST /api/v1/auth/refresh`
 
-/api/v1/auth/refresh
+```json
+{ "refreshToken": "0BFO4KMkr1cQ..." }
+```
 
-Returns a new access token. **Not implemented yet.** Rotation and family
-revocation are specified in ADR-0003.
+`200 OK` returns the same session body as login — **including a new refresh
+token**. Every refresh rotates: the presented token is revoked and replaced
+within the same family, so clients must store what comes back and discard what
+they sent.
+
+| Status | When |
+|---|---|
+| `400` | No refresh token in the request. |
+| `401` | Unknown, expired, revoked, or replayed token. |
+
+The `401` is identical in all four cases. Presenting an **already-rotated**
+token is treated as theft and revokes the entire family, ending the session for
+whoever else holds a token in it. A retry or two concurrent refreshes are
+indistinguishable from a stolen token, so both holders are signed out — the
+conservative response ADR-0003 specifies. Ordinary expiry is *not* treated as
+theft and revokes nothing.
+
+A locked-out account can still refresh. Lockout exists to stop password
+guessing, and the holder of a valid refresh token has already authenticated;
+blocking them would let anyone sign a user out of every device by deliberately
+failing five sign-ins.
 
 ---
 
 ## Logout
 
-POST
+`POST /api/v1/auth/logout`
 
-/api/v1/auth/logout
+```json
+{ "refreshToken": "0BFO4KMkr1cQ..." }
+```
 
-**Not implemented yet.**
+`204 No Content`, always — including for an unknown or already-revoked token.
+Sign-out is idempotent, and any other answer would let an unauthenticated caller
+test whether a token is real. `400` only if the request carries no token at all.
+
+Revokes the presented token's whole family, so it ends that device's session and
+leaves other devices signed in.
+
+**The access token is not revoked.** It is a stateless JWT and stays valid until
+it expires, at most 15 minutes later. Signing out ends the ability to obtain new
+access tokens, not the one already issued.
 
 ---
 

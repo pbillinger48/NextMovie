@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NextMovie.Api.Domain.Authentication;
 using NextMovie.Api.Features.Auth;
@@ -175,23 +174,9 @@ public sealed class AuthEndpointsTests(PostgresFixture postgres) : IAsyncLifetim
         // whether an address has an account.
         Assert.Equal(HttpStatusCode.Unauthorized, wrongPassword.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, unknownAccount.StatusCode);
-        Assert.Equal(await ProblemWithoutTraceIdAsync(wrongPassword), await ProblemWithoutTraceIdAsync(unknownAccount));
-    }
-
-    /// <summary>
-    /// The ProblemDetails body with <c>traceId</c> stripped.
-    /// </summary>
-    /// <remarks>
-    /// Every response carries a different trace id by design, and it is derived
-    /// from the request rather than from anything about the account — so it is
-    /// the one field that may differ without leaking whether the address exists.
-    /// </remarks>
-    private static async Task<string> ProblemWithoutTraceIdAsync(HttpResponseMessage response)
-    {
-        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(Ct))!.AsObject();
-        problem.Remove("traceId");
-
-        return problem.ToJsonString();
+        Assert.Equal(
+            await ProblemBody.WithoutTraceIdAsync(wrongPassword, Ct),
+            await ProblemBody.WithoutTraceIdAsync(unknownAccount, Ct));
     }
 
     [Fact]
