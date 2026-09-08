@@ -8,6 +8,7 @@ using NextMovie.Api.Domain;
 using NextMovie.Api.Features.Auth;
 using NextMovie.Api.Features.Health;
 using NextMovie.Api.Features.Movies;
+using NextMovie.Api.Features.Users;
 using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.ErrorHandling;
 using NextMovie.Api.Infrastructure.OpenApi;
@@ -117,10 +118,8 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-// No endpoint requires authentication yet — /users/me and the rest of the
-// authenticated surface land with the slices that need them. The middleware is
-// wired now so that tokens are validated by the same configuration that issues
-// them from the moment the first protected endpoint appears.
+// Bearer tokens are validated by the same configuration that issues them, so
+// the two cannot drift apart. /api/v1/users/me is the first endpoint behind it.
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -137,6 +136,8 @@ RegisterUser.Map(app);
 LoginUser.Map(app);
 RefreshSession.Map(app);
 LogoutUser.Map(app);
+GetCurrentUser.Map(app);
+UpdateCurrentUser.Map(app);
 
 app.Run();
 

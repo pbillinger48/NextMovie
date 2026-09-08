@@ -124,6 +124,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the signed-in user's profile
+         * @description Returns the profile of the account the access token belongs to.
+         */
+        get: operations["GetCurrentUser"];
+        /**
+         * Update the signed-in user's profile
+         * @description Replaces the editable parts of the profile. Fields omitted from the request are cleared.
+         */
+        put: operations["UpdateCurrentUser"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -268,6 +292,32 @@ export interface components {
             totalResults: number;
             /** @description Films on this page, ordered by relevance. */
             results: components["schemas"]["MovieSummary"][];
+        };
+        /** @description The new state of the editable profile. */
+        UpdateCurrentUserRequest: {
+            /** @description Name to show in the UI. Required. */
+            displayName: null | string;
+            /** @description Absolute http or https avatar URL. Omit or send null to clear it. */
+            profileImageUrl: null | string;
+        };
+        /** @description A user's own profile. */
+        UserProfileResponse: {
+            /**
+             * Format: uuid
+             * @description NextMovie user identifier.
+             */
+            id: string;
+            /** @description Email address, as the user entered it. */
+            email: string;
+            /** @description Name shown in the UI. */
+            displayName: string;
+            /** @description Avatar URL, when one is set. */
+            profileImageUrl: null | string;
+            /**
+             * Format: date-time
+             * @description When the account was created.
+             */
+            createdAt: string;
         };
     };
     responses: never;
@@ -483,6 +533,77 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfileResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCurrentUserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfileResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
