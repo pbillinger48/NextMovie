@@ -1,18 +1,16 @@
-import "server-only";
-
-import { createApiClient, type SearchMoviesResponse } from "@nextmovie/api-client";
-
 /**
  * API access for server components.
  *
- * The `server-only` import above is load-bearing: it makes importing this module
+ * The `server-only` import below is load-bearing: it makes importing this module
  * from a client component a build error rather than a runtime surprise. Per
  * ADR-0001 the browser never talks to the API directly — that is what keeps CORS
  * unnecessary and leaves the BFF option open.
  */
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5080";
+import "server-only";
 
-const client = createApiClient(baseUrl);
+import { type SearchMoviesResponse } from "@nextmovie/api-client";
+
+import { api } from "./api-client";
 
 /** A search that failed in a way worth showing the user. */
 export type SearchFailure =
@@ -37,7 +35,7 @@ export async function searchMovies(
   page: number = 1,
 ): Promise<SearchResult> {
   try {
-    const { data, error, response } = await client.GET("/api/v1/movies/search", {
+    const { data, error, response } = await api.GET("/api/v1/movies/search", {
       params: { query: { title, page } },
     });
 

@@ -12,6 +12,9 @@ export type MovieSummary = components["schemas"]["MovieSummary"];
 export type SearchMoviesResponse = components["schemas"]["SearchMoviesResponse"];
 export type HealthResponse = components["schemas"]["HealthResponse"];
 export type ProblemDetails = components["schemas"]["HttpValidationProblemDetails"];
+export type AuthenticationResponse = components["schemas"]["AuthenticationResponse"];
+export type AuthenticatedUser = components["schemas"]["AuthenticatedUser"];
+export type UserProfileResponse = components["schemas"]["UserProfileResponse"];
 
 export type { paths };
 
