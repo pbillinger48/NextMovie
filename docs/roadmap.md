@@ -29,7 +29,7 @@
 - [x] Register
 - [x] Login
 - [x] JWT
-- [ ] Google OAuth
+- [x] Google OAuth
 - [x] User Profile
 
 ---

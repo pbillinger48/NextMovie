@@ -14,6 +14,7 @@ import { api } from "./api-client";
 export type AuthFailure =
   | { kind: "invalid-credentials"; message: string }
   | { kind: "email-taken"; message: string }
+  | { kind: "email-unverified"; message: string }
   | { kind: "validation"; message: string; fieldErrors: Record<string, string[]> }
   | { kind: "unreachable"; message: string };
 
@@ -45,6 +46,16 @@ export async function login(email: string, password: string): Promise<AuthOutcom
  */
 export async function refresh(refreshToken: string): Promise<AuthOutcome> {
   return call(() => api.POST("/api/v1/auth/refresh", { body: { refreshToken } }));
+}
+
+/**
+ * Exchanges a verified Google ID token for a NextMovie session.
+ *
+ * The API does the verifying (ADR-0005). This tier's job was getting the token
+ * out of Google and putting the resulting session into a cookie.
+ */
+export async function signInWithGoogle(idToken: string): Promise<AuthOutcome> {
+  return call(() => api.POST("/api/v1/auth/google", { body: { idToken } }));
 }
 
 /**
@@ -101,6 +112,18 @@ async function call(request: ApiCall): Promise<AuthOutcome> {
         error: {
           kind: "invalid-credentials",
           message: "The email address or password is incorrect.",
+        },
+      };
+
+    case 403:
+      // Google authenticated them, but the address on the account is unverified
+      // and ADR-0005 will not link or create on that basis.
+      return {
+        ok: false,
+        error: {
+          kind: "email-unverified",
+          message:
+            "That Google account's email address is not verified. Verify it with Google and try again.",
         },
       };
 
