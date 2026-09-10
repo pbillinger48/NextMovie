@@ -30,7 +30,7 @@
 - [x] Login
 - [x] JWT
 - [ ] Google OAuth
-- [ ] User Profile
+- [x] User Profile
 
 ---
 

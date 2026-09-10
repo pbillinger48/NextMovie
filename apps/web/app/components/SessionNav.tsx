@@ -32,9 +32,12 @@ export async function SessionNav() {
 
   return (
     <nav className="flex items-center gap-4 text-sm">
-      <span className="text-neutral-600 dark:text-neutral-400">
+      <Link
+        href="/profile"
+        className="text-neutral-600 hover:underline underline-offset-4 dark:text-neutral-400"
+      >
         {session.user.displayName}
-      </span>
+      </Link>
 
       {/*
         A form, not a link: signing out changes state, and ADR-0004's CSRF
