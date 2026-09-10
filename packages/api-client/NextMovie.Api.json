@@ -454,6 +454,145 @@
           }
         }
       }
+    },
+    "/api/v1/movies/{id}/rating": {
+      "put": {
+        "tags": [
+          "RateMovie"
+        ],
+        "summary": "Rate a film",
+        "description": "Records the signed-in user's rating of a film, on a 0.5–5.0 half-star scale. Rating a film also records that it was watched.",
+        "operationId": "RateMovie",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RateMovieRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieRating"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "UnrateMovie"
+        ],
+        "summary": "Remove a rating",
+        "description": "Removes the signed-in user's rating of a film. The film stays in their watch history.",
+        "operationId": "UnrateMovie",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/ratings": {
+      "get": {
+        "tags": [
+          "GetMyRatings"
+        ],
+        "summary": "List the signed-in user's ratings",
+        "description": "Returns rated films, most recently rated first.",
+        "operationId": "GetMyRatings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyRatingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -756,6 +895,33 @@
         },
         "description": "Everything the catalogue holds about a film."
       },
+      "MovieRating": {
+        "required": [
+          "movieId",
+          "rating",
+          "ratedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "description": "The film rated.",
+            "format": "uuid"
+          },
+          "rating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": "number",
+            "description": "0.5 to 5.0, in half-stars.",
+            "format": "double"
+          },
+          "ratedAt": {
+            "type": "string",
+            "description": "When the rating was last set or changed.",
+            "format": "date-time"
+          }
+        },
+        "description": "The signed-in user's rating of a film."
+      },
       "MovieSummary": {
         "required": [
           "id",
@@ -825,6 +991,22 @@
         },
         "description": "Summary view of a film."
       },
+      "MyRatingsResponse": {
+        "required": [
+          "ratings"
+        ],
+        "type": "object",
+        "properties": {
+          "ratings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RatedMovie"
+            },
+            "description": "Rated films, most recently rated first."
+          }
+        },
+        "description": "A page of the user's ratings."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -861,6 +1043,73 @@
             ]
           }
         }
+      },
+      "RatedMovie": {
+        "required": [
+          "movieId",
+          "title",
+          "posterPath",
+          "releaseDate",
+          "rating",
+          "ratedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "description": "NextMovie identifier.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title."
+          },
+          "posterPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Relative TMDb poster path."
+          },
+          "releaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Release date, when known.",
+            "format": "date"
+          },
+          "rating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": "number",
+            "description": "0.5 to 5.0, in half-stars.",
+            "format": "double"
+          },
+          "ratedAt": {
+            "type": "string",
+            "description": "When the rating was last set or changed.",
+            "format": "date-time"
+          }
+        },
+        "description": "A film the user has rated."
+      },
+      "RateMovieRequest": {
+        "required": [
+          "rating"
+        ],
+        "type": "object",
+        "properties": {
+          "rating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "0.5 to 5.0, in half-stars.",
+            "format": "double"
+          }
+        },
+        "description": "A rating to record."
       },
       "RefreshSessionRequest": {
         "required": [
@@ -1057,6 +1306,15 @@
     },
     {
       "name": "UpdateCurrentUser"
+    },
+    {
+      "name": "RateMovie"
+    },
+    {
+      "name": "UnrateMovie"
+    },
+    {
+      "name": "GetMyRatings"
     }
   ]
 }

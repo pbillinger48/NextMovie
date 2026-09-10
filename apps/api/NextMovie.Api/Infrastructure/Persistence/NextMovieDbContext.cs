@@ -20,6 +20,10 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
 
     public DbSet<UserExternalLogin> UserExternalLogins => Set<UserExternalLogin>();
 
+    public DbSet<Rating> Ratings => Set<Rating>();
+
+    public DbSet<WatchHistoryEntry> WatchHistory => Set<WatchHistoryEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configurations are applied explicitly rather than via
@@ -30,6 +34,8 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
         modelBuilder.ApplyConfiguration(new UserExternalLoginConfiguration());
+        modelBuilder.ApplyConfiguration(new RatingConfiguration());
+        modelBuilder.ApplyConfiguration(new WatchHistoryEntryConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

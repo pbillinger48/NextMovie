@@ -8,6 +8,7 @@ using NextMovie.Api.Domain;
 using NextMovie.Api.Features.Auth;
 using NextMovie.Api.Features.Health;
 using NextMovie.Api.Features.Movies;
+using NextMovie.Api.Features.Ratings;
 using NextMovie.Api.Features.Users;
 using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.Auth.Google;
@@ -44,6 +45,7 @@ builder.Services.AddDbContext<NextMovieDbContext>(options => options
     .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<MovieCatalog>();
+builder.Services.AddScoped<UserLibrary>();
 
 // Bound and validated at startup rather than on first use: a missing TMDb token
 // or signing key should stop the process immediately with a clear message, not
@@ -156,6 +158,9 @@ LogoutUser.Map(app);
 SignInWithGoogle.Map(app);
 GetCurrentUser.Map(app);
 UpdateCurrentUser.Map(app);
+RateMovie.Map(app);
+UnrateMovie.Map(app);
+GetMyRatings.Map(app);
 
 app.Run();
 
