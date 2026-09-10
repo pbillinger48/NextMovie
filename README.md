@@ -236,7 +236,23 @@ Run from the repository root; Turborepo fans each task out across workspaces.
 | `pnpm build` | Build all packages and apps |
 | `pnpm lint` | Lint all workspaces |
 | `pnpm typecheck` | Type-check all workspaces |
-| `pnpm test` | Run all tests |
+| `pnpm test` | Run all JavaScript tests |
+
+The .NET suite is separate, since Turborepo does not drive it:
+
+```bash
+dotnet test apps/api/NextMovie.slnx
+```
+
+It uses Testcontainers, so **Docker must be running** — the persistence and
+endpoint tests execute against a real PostgreSQL rather than an in-memory fake
+that would accept constraints the real database rejects.
+
+`pnpm test` covers the web tier's pure logic: the token refresh boundary, the
+session shape, the Google OAuth helpers (PKCE, nonce, state comparison), and how
+API failures are translated for the user. Anything needing a browser, a cookie
+round trip or a live API is not covered there and has to be exercised against a
+running stack.
 
 ## Contributing
 

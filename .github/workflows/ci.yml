@@ -68,6 +68,11 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # The web tier holds real security logic — the refresh boundary, PKCE, the
+      # OAuth state comparison — that lint and typecheck cannot judge.
+      - name: Test
+        run: pnpm test
+
       - name: Build
         run: pnpm build
 
