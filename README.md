@@ -107,7 +107,8 @@ dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)"
 ```
 
 Both are validated at startup, so the API will refuse to run without them rather
-than failing on the first request that needs one.
+than failing on the first request that needs one. So is `Google__ClientIds__0`,
+which is **not** a secret and lives in `.env` — see [`.env.example`](.env.example).
 
 `Jwt:SigningKey` signs access tokens with HS256 and must be at least 32
 characters. Treat it like the database password — anyone holding it can mint a

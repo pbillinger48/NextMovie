@@ -10,6 +10,7 @@ using NextMovie.Api.Features.Health;
 using NextMovie.Api.Features.Movies;
 using NextMovie.Api.Features.Users;
 using NextMovie.Api.Infrastructure.Auth;
+using NextMovie.Api.Infrastructure.Auth.Google;
 using NextMovie.Api.Infrastructure.ErrorHandling;
 using NextMovie.Api.Infrastructure.OpenApi;
 using NextMovie.Api.Infrastructure.Persistence;
@@ -57,6 +58,14 @@ var jwtOptions = builder.Services
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
     .ValidateDataAnnotations();
 
+// Client IDs are public, not secret, but the allow-list is still the boundary
+// that stops a token minted for somebody else's Google client signing anyone in
+// here — so a missing one should stop the process, not fail at first sign-in.
+var googleOptions = builder.Services
+    .AddOptions<GoogleOptions>()
+    .Bind(builder.Configuration.GetSection(GoogleOptions.SectionName))
+    .ValidateDataAnnotations();
+
 // ...with one exception. The build-time OpenAPI generator (GetDocument.Insider,
 // see OpenApiGenerateDocumentsOnBuild in the csproj) starts the host in-process
 // to read endpoint metadata. It has no secrets and needs none, so startup
@@ -67,6 +76,7 @@ if (Assembly.GetEntryAssembly()?.GetName().Name != "GetDocument.Insider")
 {
     tmdbOptions.ValidateOnStart();
     jwtOptions.ValidateOnStart();
+    googleOptions.ValidateOnStart();
 }
 
 // Injected rather than called statically so tests can move time forward without
@@ -79,6 +89,12 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
+
+// Singleton so the OpenID Connect metadata — and the signing keys in it — are
+// cached for the process rather than refetched per sign-in.
+builder.Services.AddHttpClient(nameof(GoogleSigningKeyProvider));
+builder.Services.AddSingleton<IGoogleSigningKeyProvider, GoogleSigningKeyProvider>();
+builder.Services.AddSingleton<IGoogleIdTokenVerifier, GoogleIdTokenVerifier>();
 builder.Services.AddSingleton<RefreshTokenFactory>();
 builder.Services.AddScoped<SessionIssuer>();
 builder.Services.AddScoped<SessionRevoker>();
@@ -136,6 +152,7 @@ RegisterUser.Map(app);
 LoginUser.Map(app);
 RefreshSession.Map(app);
 LogoutUser.Map(app);
+SignInWithGoogle.Map(app);
 GetCurrentUser.Map(app);
 UpdateCurrentUser.Map(app);
 

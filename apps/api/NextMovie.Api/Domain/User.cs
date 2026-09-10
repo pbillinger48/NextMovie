@@ -84,6 +84,9 @@ public class User
     /// <summary>Refresh tokens issued to this user, active and historical.</summary>
     public ICollection<RefreshToken> RefreshTokens { get; init; } = [];
 
+    /// <summary>Third-party identities that can sign in as this user.</summary>
+    public ICollection<UserExternalLogin> ExternalLogins { get; init; } = [];
+
     /// <summary>
     /// Whether sign-in is currently barred for this account.
     /// </summary>

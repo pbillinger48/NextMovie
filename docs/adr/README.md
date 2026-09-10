@@ -22,7 +22,7 @@ Where an ADR and `docs/` disagree, **the ADR wins** — the product docs predate
 | [0002](0002-generate-typescript-from-openapi.md) | Generate TypeScript types from the OpenAPI schema | Accepted |
 | [0003](0003-own-auth-endpoints-with-identity-password-hashing.md) | Own authentication endpoints, using Identity's password hasher | Accepted |
 | [0004](0004-httponly-cookie-session-in-the-web-tier.md) | Keep the browser session in an httpOnly cookie held by Next.js | Accepted |
-| [0005](0005-verify-google-id-tokens-at-the-api.md) | Clients obtain Google ID tokens; the API verifies them | Proposed |
+| [0005](0005-verify-google-id-tokens-at-the-api.md) | Clients obtain Google ID tokens; the API verifies them | Accepted |
 
 ## Template
 

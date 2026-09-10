@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using NextMovie.Api.Infrastructure.Auth.Google;
 
 namespace NextMovie.Api.Tests;
 
@@ -35,6 +39,19 @@ public sealed class NextMovieApiFactory : WebApplicationFactory<Program>
     internal const string Issuer = "nextmovie-api-tests";
 
     internal const string Audience = "nextmovie-tests";
+
+    internal const string GoogleClientId = "nextmovie-test.apps.googleusercontent.com";
+
+    /// <summary>
+    /// Stands in for Google's token verification.
+    /// </summary>
+    /// <remarks>
+    /// Tests of the sign-in rules are about what we do with a verified identity —
+    /// create, link, or refuse. Minting real Google tokens to get there would test
+    /// Google's signing rather than our linking, and the verification itself is
+    /// covered directly in <c>GoogleIdTokenVerifierTests</c>.
+    /// </remarks>
+    internal IGoogleIdTokenVerifier? GoogleIdTokens { get; init; }
 
     private readonly string _connectionString;
 
@@ -73,8 +90,19 @@ public sealed class NextMovieApiFactory : WebApplicationFactory<Program>
                 ["Jwt:Issuer"] = Issuer,
                 ["Jwt:Audience"] = Audience,
 
+                ["Google:ClientIds:0"] = GoogleClientId,
+
                 ["ConnectionStrings:NextMovieDb"] = _connectionString,
             });
         });
+
+        if (GoogleIdTokens is not null)
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IGoogleIdTokenVerifier>();
+                services.AddSingleton(GoogleIdTokens);
+            });
+        }
     }
 }

@@ -124,6 +124,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in with Google
+         * @description Verifies a Google ID token and returns a NextMovie session, creating an account or linking the Google identity to an existing one.
+         */
+        post: operations["SignInWithGoogle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/me": {
         parameters: {
             query?: never;
@@ -292,6 +312,11 @@ export interface components {
             totalResults: number;
             /** @description Films on this page, ordered by relevance. */
             results: components["schemas"]["MovieSummary"][];
+        };
+        /** @description The Google ID token to sign in with. */
+        SignInWithGoogleRequest: {
+            /** @description An ID token obtained by the client from Google. */
+            idToken: null | string;
         };
         /** @description The new state of the editable profile. */
         UpdateCurrentUserRequest: {
@@ -533,6 +558,57 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+        };
+    };
+    SignInWithGoogle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignInWithGoogleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
