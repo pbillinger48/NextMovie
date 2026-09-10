@@ -268,6 +268,68 @@
         }
       }
     },
+    "/api/v1/auth/google": {
+      "post": {
+        "tags": [
+          "SignInWithGoogle"
+        ],
+        "summary": "Sign in with Google",
+        "description": "Verifies a Google ID token and returns a NextMovie session, creating an account or linking the Google identity to an existing one.",
+        "operationId": "SignInWithGoogle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInWithGoogleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/me": {
       "get": {
         "tags": [
@@ -721,6 +783,22 @@
         },
         "description": "A page of search results."
       },
+      "SignInWithGoogleRequest": {
+        "required": [
+          "idToken"
+        ],
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An ID token obtained by the client from Google."
+          }
+        },
+        "description": "The Google ID token to sign in with."
+      },
       "UpdateCurrentUserRequest": {
         "required": [
           "displayName",
@@ -803,6 +881,9 @@
     },
     {
       "name": "LogoutUser"
+    },
+    {
+      "name": "SignInWithGoogle"
     },
     {
       "name": "GetCurrentUser"

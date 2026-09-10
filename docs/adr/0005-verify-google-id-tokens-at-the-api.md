@@ -1,6 +1,6 @@
 # ADR-0005: Clients obtain Google ID tokens; the API verifies them
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-10
 
 ## Context

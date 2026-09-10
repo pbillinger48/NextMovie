@@ -60,6 +60,16 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
+
+    <!--
+      Google's OpenID Connect discovery document and JWKS, per ADR-0005. Used for
+      its ConfigurationManager, which caches the signing keys and refetches them
+      when Google rotates - the part that would be easy to write and easy to get
+      wrong, since a stale key set means every sign-in fails until a restart.
+      Arrives transitively with JwtBearer; pinned explicitly because we call it
+      directly.
+    -->
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.22.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 

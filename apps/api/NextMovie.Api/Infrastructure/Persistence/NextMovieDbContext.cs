@@ -18,6 +18,8 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<UserExternalLogin> UserExternalLogins => Set<UserExternalLogin>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configurations are applied explicitly rather than via
@@ -27,6 +29,7 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
         modelBuilder.ApplyConfiguration(new GenreConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new UserExternalLoginConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

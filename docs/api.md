@@ -138,6 +138,40 @@ confirm the address exists.
 
 ---
 
+## Sign in with Google
+
+`POST /api/v1/auth/google`
+
+```json
+{ "idToken": "eyJhbGciOiJSUzI1NiIs..." }
+```
+
+The client completes the Google flow itself and posts the resulting ID token
+([ADR-0005](adr/0005-verify-google-id-tokens-at-the-api.md)) — the API handles no
+redirects and holds no client secret. `200 OK` returns the same session body as
+login, and that session refreshes and revokes like any other.
+
+| Status | When |
+|---|---|
+| `400` | No ID token in the request. |
+| `401` | The token failed verification: bad signature, wrong audience, wrong issuer, or expired. |
+| `403` | Google reports the account's email address as unverified. |
+
+What happens on success depends on what we already know:
+
+| Situation | Result |
+|---|---|
+| The Google subject is already linked | Signed in as that account |
+| Verified address matches an existing account | Linked to it, then signed in — the password keeps working |
+| Verified address is unknown | A new account, with no password |
+| Address is **not** verified by Google | `403`, whether or not an account exists |
+
+Identity is keyed on Google's `sub`, never on the email address. Changing your
+Google address keeps you in the same account, and whoever later acquires your old
+address does not inherit it.
+
+---
+
 ## Refresh Token
 
 `POST /api/v1/auth/refresh`
