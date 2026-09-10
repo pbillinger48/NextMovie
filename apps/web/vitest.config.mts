@@ -13,7 +13,13 @@ export default defineConfig({
   resolve: {
     // Mirrors the `@/*` path alias in tsconfig.json. Defined by hand rather than
     // pulling in vite-tsconfig-paths: one line against one more dependency.
-    alias: { "@": path.resolve(import.meta.dirname, ".") },
+    alias: {
+      "@": path.resolve(import.meta.dirname, "."),
+
+      // See the stub for why. Without this, importing any module that carries
+      // the server-only marker fails before a single assertion runs.
+      "server-only": path.resolve(import.meta.dirname, "test/server-only-stub.ts"),
+    },
   },
   test: {
     // Everything under test here is server-side: session sealing, OAuth helpers,
