@@ -64,6 +64,58 @@ internal static class TmdbMovieMapper
         return new MappedMovie(movie, dto.GenreIds ?? []);
     }
 
+    /// <summary>
+    /// Maps TMDb's details response to a domain <see cref="Movie"/>, or returns
+    /// <see langword="null"/> if the record is unusable.
+    /// </summary>
+    /// <param name="dto">The details TMDb returned.</param>
+    /// <param name="refreshedAt">
+    /// Stamped onto <see cref="Movie.DetailsRefreshedAt"/>, which is what marks
+    /// this film as having been enriched. Passed in rather than read from the
+    /// clock so the caller decides what "now" means, and so it is testable.
+    /// </param>
+    /// <remarks>
+    /// Deliberately produces the same <see cref="MappedMovie"/> as the search
+    /// mapper, so a detailed film goes through exactly the same upsert path.
+    /// The difference is what it carries: runtime, status, and the refresh stamp
+    /// — the three fields search cannot supply.
+    /// </remarks>
+    public static MappedMovie? ToDomain(TmdbMovieDetailsResponse dto, DateTimeOffset refreshedAt)
+    {
+        if (dto.Id <= 0 || string.IsNullOrWhiteSpace(dto.Title))
+        {
+            return null;
+        }
+
+        var movie = new Movie
+        {
+            TmdbId = dto.Id,
+            Title = dto.Title.Trim(),
+            OriginalTitle = Normalize(dto.OriginalTitle),
+            Overview = Normalize(dto.Overview),
+            PosterPath = Normalize(dto.PosterPath),
+            BackdropPath = Normalize(dto.BackdropPath),
+            ReleaseDate = ParseReleaseDate(dto.ReleaseDate),
+            AverageRating = ParseRating(dto.VoteAverage, dto.VoteCount),
+            Popularity = dto.Popularity,
+            Language = Normalize(dto.OriginalLanguage),
+
+            // TMDb reports 0 for films whose runtime it does not know. Storing
+            // that would claim a film is zero minutes long, which is a different
+            // statement from "we do not know".
+            Runtime = dto.Runtime is > 0 ? dto.Runtime : null,
+            Status = Normalize(dto.Status),
+            DetailsRefreshedAt = refreshedAt,
+        };
+
+        // The details endpoint returns full genre objects where search returns
+        // bare ids. Only the ids are taken: genre names are reference data we
+        // already seed, and trusting TMDb's spelling here would let it drift.
+        var genreIds = dto.Genres?.Select(genre => genre.Id).Where(id => id > 0).ToArray() ?? [];
+
+        return new MappedMovie(movie, genreIds);
+    }
+
     /// <summary>Collapses empty and whitespace-only strings to null.</summary>
     /// <remarks>
     /// TMDb uses <c>""</c> where null is meant. Storing empty strings would make

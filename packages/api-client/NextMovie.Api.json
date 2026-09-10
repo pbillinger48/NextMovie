@@ -77,6 +77,49 @@
         }
       }
     },
+    "/api/v1/movies/{id}": {
+      "get": {
+        "tags": [
+          "GetMovieDetails"
+        ],
+        "summary": "Get a film",
+        "description": "Returns a film from the NextMovie catalogue, enriching it from TMDb when its details are missing or stale.",
+        "operationId": "GetMovieDetails",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/register": {
       "post": {
         "tags": [
@@ -592,6 +635,127 @@
         },
         "description": "The session to end."
       },
+      "MovieDetails": {
+        "required": [
+          "id",
+          "tmdbId",
+          "title",
+          "originalTitle",
+          "overview",
+          "posterPath",
+          "backdropPath",
+          "releaseDate",
+          "runtime",
+          "averageRating",
+          "popularity",
+          "language",
+          "status",
+          "genres"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "NextMovie identifier.",
+            "format": "uuid"
+          },
+          "tmdbId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "TMDb identifier, exposed for attribution and deep links.",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title."
+          },
+          "originalTitle": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Title in the original language, when it differs."
+          },
+          "overview": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Synopsis, when TMDb has one."
+          },
+          "posterPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Relative TMDb poster path; combine with a TMDb image base URL to render."
+          },
+          "backdropPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Relative TMDb backdrop path."
+          },
+          "releaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Release date, when known.",
+            "format": "date"
+          },
+          "runtime": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Runtime in minutes. Null when TMDb does not know it.",
+            "format": "int32"
+          },
+          "averageRating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "TMDb community rating 0–10. Null when the film has no votes.",
+            "format": "double"
+          },
+          "popularity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "TMDb popularity score. Only meaningful compared against other films.",
+            "format": "double"
+          },
+          "language": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ISO 639-1 code of the original language."
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "TMDb release status, e.g. `Released`."
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Genre names, alphabetically."
+          }
+        },
+        "description": "Everything the catalogue holds about a film."
+      },
       "MovieSummary": {
         "required": [
           "id",
@@ -869,6 +1033,9 @@
     },
     {
       "name": "SearchMovies"
+    },
+    {
+      "name": "GetMovieDetails"
     },
     {
       "name": "RegisterUser"

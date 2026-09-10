@@ -68,4 +68,16 @@ public class Movie
 
     /// <summary>When this row was last refreshed from TMDb.</summary>
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// When this film was last enriched from TMDb's details endpoint, or null if
+    /// it never has been.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="UpdatedAt"/>, which moves on every search that
+    /// happens to return this film. Search results carry no runtime and no
+    /// status, so "recently updated" says nothing about whether the details are
+    /// present — only this does.
+    /// </remarks>
+    public DateTimeOffset? DetailsRefreshedAt { get; set; }
 }

@@ -152,6 +152,14 @@ internal sealed class MovieCatalog(NextMovieDbContext db, ILogger<MovieCatalog> 
             current.Status = incoming.Status;
         }
 
+        // Same reasoning: only a details fetch sets this, and a search upsert
+        // must not report the film as freshly detailed when it carried no
+        // details at all.
+        if (incoming.DetailsRefreshedAt is not null)
+        {
+            current.DetailsRefreshedAt = incoming.DetailsRefreshedAt;
+        }
+
         current.UpdatedAt = DateTimeOffset.UtcNow;
 
         foreach (var genre in genres.Where(g => !current.Genres.Any(existing => existing.Id == g.Id)))
