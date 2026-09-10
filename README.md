@@ -51,8 +51,9 @@ nvm use
 # 2. Install JavaScript dependencies
 pnpm install
 
-# 3. Create your local environment file
-cp .env.example .env
+# 3. Create your local environment files
+cp .env.example .env                        # docker-compose only
+cp apps/web/.env.example apps/web/.env.local  # the web app
 
 # 4. Start PostgreSQL
 docker compose up -d
@@ -95,10 +96,24 @@ dotnet ef migrations script --project apps/api/NextMovie.Api --idempotent
 For deployed environments, generate an idempotent script, review it, and let the
 deploy pipeline apply it — the application itself never runs migrations.
 
-### API secrets
+### Where configuration lives
 
-Secrets are **not** stored in `.env`. The API reads them via .NET user-secrets,
-which keeps them outside the repository directory entirely:
+Three places, and each app only reads its own. **The root `.env` is read by
+docker-compose alone** — .NET has no `.env` convention, and Next.js loads env
+files from `apps/web/`, not the repository root.
+
+| Setting | Where it goes |
+|---|---|
+| `POSTGRES_*` | root `.env` (docker-compose) |
+| `ConnectionStrings:NextMovieDb`, `Google:ClientIds` | `apps/api/NextMovie.Api/appsettings.Development.json` (committed, no secrets) |
+| `Tmdb:ApiReadAccessToken`, `Jwt:SigningKey` | .NET user-secrets (never in the repo) |
+| `SESSION_COOKIE_PASSWORD`, `GOOGLE_CLIENT_*` | `apps/web/.env.local` |
+
+In deployed environments the API's settings come from environment variables
+instead (`ConnectionStrings__NextMovieDb`, `Google__ClientIds__0`) — .NET does map
+double underscores onto configuration keys; it simply does not read `.env` files.
+
+### API secrets
 
 ```bash
 cd apps/api/NextMovie.Api
@@ -106,9 +121,11 @@ dotnet user-secrets set "Tmdb:ApiReadAccessToken" "<your-v4-token>"
 dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)"
 ```
 
-Both are validated at startup, so the API will refuse to run without them rather
-than failing on the first request that needs one. So is `Google__ClientIds__0`,
-which is **not** a secret and lives in `.env` — see [`.env.example`](.env.example).
+Both are validated at startup, so the API refuses to run without them rather than
+failing on the first request that needs one. `Google:ClientIds` is validated the
+same way but is not a secret, so a placeholder ships in
+`appsettings.Development.json` — it matches no real token, which is what you want
+until you add one.
 
 `Jwt:SigningKey` signs access tokens with HS256 and must be at least 32
 characters. Treat it like the database password — anyone holding it can mint a
@@ -134,9 +151,9 @@ dotnet run --project apps/api/NextMovie.Api
 pnpm --filter @nextmovie/web dev
 ```
 
-The web app needs `SESSION_COOKIE_PASSWORD` in `.env` (at least 32 characters)
-before anyone can sign in — it encrypts the session cookie described in
-ADR-0004. Generate one with `openssl rand -base64 32`.
+The web app needs `SESSION_COOKIE_PASSWORD` in **`apps/web/.env.local`** (at least
+32 characters) before anyone can sign in — it encrypts the session cookie
+described in ADR-0004. Generate one with `openssl rand -base64 32`.
 
 Then open <http://localhost:3000> and search for a film.
 
@@ -161,11 +178,15 @@ ID token to the API, which verifies it against Google's published keys
 (ADR-0005). To use it locally, create a **Web application** OAuth client at
 [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials),
 register `http://localhost:3000/api/auth/google/callback` as an authorised
-redirect URI, and put the credentials in `.env`.
+redirect URI, and put the credentials in `apps/web/.env.local`.
 
-The client ID goes in **two** places, and they must match: `GOOGLE_CLIENT_ID` for
-the web tier that obtains the token, and `Google__ClientIds__0` for the API that
+The client ID goes in **two** places, and they must match: `GOOGLE_CLIENT_ID` in
+`apps/web/.env.local` for the web tier that obtains the token, and
+`Google:ClientIds` in the API's `appsettings.Development.json` for the API that
 decides whose tokens it will trust. The secret goes only in the web tier.
+
+Everything else runs without them — the shipped placeholder simply means the
+Google button fails at Google.
 
 ### Sessions
 
