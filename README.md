@@ -154,6 +154,19 @@ The browser never calls the API directly. Search runs in a React Server
 Component, so there is no CORS configuration and no API URL in client code
 (ADR-0001).
 
+### Google sign-in
+
+The web tier runs the authorization-code flow with PKCE and hands the resulting
+ID token to the API, which verifies it against Google's published keys
+(ADR-0005). To use it locally, create a **Web application** OAuth client at
+[console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials),
+register `http://localhost:3000/api/auth/google/callback` as an authorised
+redirect URI, and put the credentials in `.env`.
+
+The client ID goes in **two** places, and they must match: `GOOGLE_CLIENT_ID` for
+the web tier that obtains the token, and `Google__ClientIds__0` for the API that
+decides whose tokens it will trust. The secret goes only in the web tier.
+
 ### Sessions
 
 The API only ever accepts bearer tokens, because mobile will need them. The
