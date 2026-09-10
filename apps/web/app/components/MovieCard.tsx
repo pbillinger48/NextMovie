@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import type { MovieSummary } from "@nextmovie/api-client";
 
 /**
@@ -17,6 +18,15 @@ export function MovieCard({ movie }: { movie: MovieSummary }) {
 
   return (
     <li className="flex flex-col gap-2">
+      {/*
+        The whole card is one link rather than a linked title with a separate
+        linked poster: two links to the same place double the tab stops and read
+        as duplicates to a screen reader.
+      */}
+      <Link
+        href={`/movies/${movie.id}`}
+        className="group flex flex-col gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+      >
       <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-neutral-200 dark:bg-neutral-800">
         {movie.posterPath ? (
           <Image
@@ -41,7 +51,9 @@ export function MovieCard({ movie }: { movie: MovieSummary }) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm leading-snug font-medium">{movie.title}</h3>
+        <h3 className="text-sm leading-snug font-medium group-hover:underline underline-offset-2">
+          {movie.title}
+        </h3>
 
         <p className="text-xs text-neutral-600 dark:text-neutral-400">
           {year ?? "Year unknown"}
@@ -61,6 +73,7 @@ export function MovieCard({ movie }: { movie: MovieSummary }) {
           </p>
         )}
       </div>
+      </Link>
     </li>
   );
 }

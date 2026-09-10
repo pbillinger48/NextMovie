@@ -8,7 +8,7 @@
  */
 import "server-only";
 
-import { type SearchMoviesResponse } from "@nextmovie/api-client";
+import { type MovieDetails, type SearchMoviesResponse } from "@nextmovie/api-client";
 
 import { api } from "./api-client";
 
@@ -62,6 +62,55 @@ export async function searchMovies(
   } catch {
     // The API itself is unreachable — a different failure from TMDb being down,
     // and worth telling the user apart from it.
+    return {
+      ok: false,
+      error: {
+        kind: "unreachable",
+        message: "Could not reach NextMovie. Please try again shortly.",
+      },
+    };
+  }
+}
+
+/** A film that could not be shown, and why. */
+export type MovieFailure =
+  | { kind: "not-found" }
+  | { kind: "unreachable"; message: string };
+
+export type MovieResult =
+  | { ok: true; data: MovieDetails }
+  | { ok: false; error: MovieFailure };
+
+/**
+ * Fetches one film by its NextMovie identifier.
+ *
+ * "Not in the catalogue" is separated from "could not ask" deliberately: the
+ * first is a 404 page, the second is a temporary problem the visitor should be
+ * invited to retry. Collapsing them would tell someone a film does not exist
+ * because our API blinked.
+ */
+export async function getMovie(id: string): Promise<MovieResult> {
+  try {
+    const { data, response } = await api.GET("/api/v1/movies/{id}", {
+      params: { path: { id } },
+    });
+
+    if (data) {
+      return { ok: true, data };
+    }
+
+    if (response.status === 404) {
+      return { ok: false, error: { kind: "not-found" } };
+    }
+
+    return {
+      ok: false,
+      error: {
+        kind: "unreachable",
+        message: "That film could not be loaded right now. Please try again shortly.",
+      },
+    };
+  } catch {
     return {
       ok: false,
       error: {

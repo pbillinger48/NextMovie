@@ -10,6 +10,7 @@ import type { components, paths } from "./schema.js";
  */
 export type MovieSummary = components["schemas"]["MovieSummary"];
 export type SearchMoviesResponse = components["schemas"]["SearchMoviesResponse"];
+export type MovieDetails = components["schemas"]["MovieDetails"];
 export type HealthResponse = components["schemas"]["HealthResponse"];
 export type ProblemDetails = components["schemas"]["HttpValidationProblemDetails"];
 export type AuthenticationResponse = components["schemas"]["AuthenticationResponse"];
