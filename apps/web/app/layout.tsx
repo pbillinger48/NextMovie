@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+
+import { SessionNav } from "./components/SessionNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,13 +18,15 @@ export default function RootLayout({
       <body className="min-h-dvh bg-neutral-50 text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
         <div className="flex min-h-dvh flex-col">
           <header className="border-b border-neutral-200 dark:border-neutral-800">
-            <div className="mx-auto w-full max-w-5xl px-4 py-4">
+            <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4">
               <Link
                 href="/"
                 className="text-lg font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
               >
                 NextMovie
               </Link>
+
+              <SessionNav />
             </div>
           </header>
 

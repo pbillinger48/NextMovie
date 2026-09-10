@@ -133,6 +133,10 @@ dotnet run --project apps/api/NextMovie.Api
 pnpm --filter @nextmovie/web dev
 ```
 
+The web app needs `SESSION_COOKIE_PASSWORD` in `.env` (at least 32 characters)
+before anyone can sign in — it encrypts the session cookie described in
+ADR-0004. Generate one with `openssl rand -base64 32`.
+
 Then open <http://localhost:3000> and search for a film.
 
 ```bash
@@ -148,6 +152,19 @@ NextMovie identifiers, and the catalogue grows as people search.
 The browser never calls the API directly. Search runs in a React Server
 Component, so there is no CORS configuration and no API URL in client code
 (ADR-0001).
+
+### Sessions
+
+The API only ever accepts bearer tokens, because mobile will need them. The
+Next.js tier converts that into an encrypted, `httpOnly` cookie the browser
+cannot read (ADR-0004), so cross-site scripting cannot steal a session and replay
+it elsewhere.
+
+Access tokens last 15 minutes and are refreshed in [`apps/web/proxy.ts`](apps/web/proxy.ts)
+before they lapse — the only place that both sees every request and may write a
+cookie. Prefetches are excluded from it deliberately: every refresh rotates the
+refresh token, and a speculative prefetch rotating one would revoke the session
+it was trying to speed up.
 
 ## The API contract
 
