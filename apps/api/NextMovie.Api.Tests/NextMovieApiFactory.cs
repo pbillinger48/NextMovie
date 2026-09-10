@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NextMovie.Api.Infrastructure.Auth.Google;
+using NextMovie.Api.Infrastructure.Tmdb;
 
 namespace NextMovie.Api.Tests;
 
@@ -53,6 +54,16 @@ public sealed class NextMovieApiFactory : WebApplicationFactory<Program>
     /// </remarks>
     internal IGoogleIdTokenVerifier? GoogleIdTokens { get; init; }
 
+    /// <summary>
+    /// Stands in for TMDb.
+    /// </summary>
+    /// <remarks>
+    /// Tests that drive an endpoint must not depend on a third party being
+    /// reachable, or on what it happens to hold today. The real client's failure
+    /// translation is tested separately against a stubbed HTTP handler.
+    /// </remarks>
+    internal ITmdbClient? Tmdb { get; init; }
+
     private readonly string _connectionString;
 
     /// <summary>Boots the API with no usable database.</summary>
@@ -96,13 +107,19 @@ public sealed class NextMovieApiFactory : WebApplicationFactory<Program>
             });
         });
 
-        if (GoogleIdTokens is not null)
+        builder.ConfigureTestServices(services =>
         {
-            builder.ConfigureTestServices(services =>
+            if (GoogleIdTokens is not null)
             {
                 services.RemoveAll<IGoogleIdTokenVerifier>();
                 services.AddSingleton(GoogleIdTokens);
-            });
-        }
+            }
+
+            if (Tmdb is not null)
+            {
+                services.RemoveAll<ITmdbClient>();
+                services.AddSingleton(Tmdb);
+            }
+        });
     }
 }

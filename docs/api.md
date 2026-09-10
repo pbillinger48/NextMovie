@@ -307,17 +307,48 @@ Query Parameters
 
 ## Movie Details
 
-GET
+`GET /api/v1/movies/{id}`
 
-/api/v1/movies/{movieId}
+The identifier is **NextMovie's**, as returned by search — not TMDb's. A third
+party's numbering is not part of our contract.
 
-Returns
+`200 OK`:
 
-Movie metadata
+```json
+{
+  "id": "0199...",
+  "tmdbId": 27205,
+  "title": "Inception",
+  "originalTitle": "Inception",
+  "overview": "A thief who steals corporate secrets…",
+  "posterPath": "/poster.jpg",
+  "backdropPath": "/backdrop.jpg",
+  "releaseDate": "2010-07-15",
+  "runtime": 148,
+  "averageRating": 8.4,
+  "popularity": 82.3,
+  "language": "en",
+  "status": "Released",
+  "genres": ["Action", "Science Fiction"]
+}
+```
 
-Streaming availability
+| Status | When |
+|---|---|
+| `404` | No film with that identifier is in the catalogue. |
 
-Recommendation explanation (if available)
+**Read-through, like search.** The film is served from our catalogue; TMDb is
+consulted only to supply what search cannot — `runtime` and `status` — or to
+refresh details older than seven days. After the first fetch, most reads never
+leave our database.
+
+**If TMDb is unavailable the film is still returned**, from whatever we already
+hold. That includes films TMDb has since removed: our copy outlives theirs.
+
+> This page previously promised streaming availability and a recommendation
+> explanation here. Neither is returned: streaming availability has no schema and
+> no region concept yet, and the recommendation engine is deferred. They will be
+> added when the features exist rather than stubbed now.
 
 ---
 

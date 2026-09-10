@@ -148,6 +148,7 @@ if (app.Environment.IsDevelopment())
 // discovery would be shorter, but this stays greppable and has no startup magic.
 GetHealth.Map(app);
 SearchMovies.Map(app);
+GetMovieDetails.Map(app);
 RegisterUser.Map(app);
 LoginUser.Map(app);
 RefreshSession.Map(app);

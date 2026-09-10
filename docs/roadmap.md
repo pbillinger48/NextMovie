@@ -36,11 +36,11 @@
 
 ## Phase 3 - Movie Data
 
-- [ ] TMDb integration
-- [ ] Movie search
-- [ ] Movie details
-- [ ] Posters
-- [ ] Genres
+- [x] TMDb integration *(shipped in Milestone 1)*
+- [x] Movie search *(shipped in Milestone 1)*
+- [x] Movie details
+- [x] Posters *(stored as TMDb paths; the web app picks the size at render)*
+- [x] Genres *(seeded reference data, resolved on every upsert)*
 
 ---
 

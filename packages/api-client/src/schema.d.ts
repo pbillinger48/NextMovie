@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/movies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a film
+         * @description Returns a film from the NextMovie catalogue, enriching it from TMDb when its details are missing or stale.
+         */
+        get: operations["GetMovieDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/register": {
         parameters: {
             query?: never;
@@ -240,6 +260,55 @@ export interface components {
             /** @description The refresh token held by the client signing out. */
             refreshToken: null | string;
         };
+        /** @description Everything the catalogue holds about a film. */
+        MovieDetails: {
+            /**
+             * Format: uuid
+             * @description NextMovie identifier.
+             */
+            id: string;
+            /**
+             * Format: int32
+             * @description TMDb identifier, exposed for attribution and deep links.
+             */
+            tmdbId: number;
+            /** @description Display title. */
+            title: string;
+            /** @description Title in the original language, when it differs. */
+            originalTitle: null | string;
+            /** @description Synopsis, when TMDb has one. */
+            overview: null | string;
+            /** @description Relative TMDb poster path; combine with a TMDb image base URL to render. */
+            posterPath: null | string;
+            /** @description Relative TMDb backdrop path. */
+            backdropPath: null | string;
+            /**
+             * Format: date
+             * @description Release date, when known.
+             */
+            releaseDate: null | string;
+            /**
+             * Format: int32
+             * @description Runtime in minutes. Null when TMDb does not know it.
+             */
+            runtime: null | number;
+            /**
+             * Format: double
+             * @description TMDb community rating 0–10. Null when the film has no votes.
+             */
+            averageRating: null | number;
+            /**
+             * Format: double
+             * @description TMDb popularity score. Only meaningful compared against other films.
+             */
+            popularity: null | number;
+            /** @description ISO 639-1 code of the original language. */
+            language: null | string;
+            /** @description TMDb release status, e.g. `Released`. */
+            status: null | string;
+            /** @description Genre names, alphabetically. */
+            genres: string[];
+        };
         /** @description Summary view of a film. */
         MovieSummary: {
             /**
@@ -401,6 +470,37 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+        };
+    };
+    GetMovieDetails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovieDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
