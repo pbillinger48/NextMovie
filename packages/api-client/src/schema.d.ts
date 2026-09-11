@@ -232,6 +232,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/import/letterboxd": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a Letterboxd export
+         * @description Accepts a Letterboxd CSV export (watched, ratings or diary), parses it, and queues it for matching against TMDb. Returns a job to poll.
+         */
+        post: operations["StartLetterboxdImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/import/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check an import
+         * @description Reports the status and progress of a Letterboxd import.
+         */
+        get: operations["GetImportStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -291,6 +331,55 @@ export interface components {
             errors?: {
                 [key: string]: string[];
             };
+        };
+        /** Format: binary */
+        IFormFile: string;
+        /** @description How an import is going. */
+        ImportJobStatusResponse: {
+            /**
+             * Format: uuid
+             * @description The job, to poll.
+             */
+            id: string;
+            /** @description Pending, Running, Completed or Failed. */
+            status: string;
+            /**
+             * Format: int32
+             * @description Rows parsed out of the export.
+             */
+            totalItems: number;
+            /**
+             * Format: int32
+             * @description Rows resolved to a film and applied.
+             */
+            matchedItems: number;
+            /**
+             * Format: int32
+             * @description Rows needing a person to choose between candidates.
+             */
+            ambiguousItems: number;
+            /**
+             * Format: int32
+             * @description Rows nothing plausible was found for.
+             */
+            unresolvedItems: number;
+            /**
+             * Format: int32
+             * @description Rows in the file that carried no title and could not be matched.
+             */
+            skippedRows: number;
+            /** @description Why the import failed, when it did. */
+            failureReason: null | string;
+            /**
+             * Format: date-time
+             * @description When the export was uploaded.
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When the import finished, if it has.
+             */
+            completedAt: null | string;
         };
         /** @description Credentials presented at sign-in. */
         LoginUserRequest: {
@@ -988,6 +1077,90 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StartLetterboxdImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: components["schemas"]["IFormFile"];
+                };
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobStatusResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetImportStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobStatusResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

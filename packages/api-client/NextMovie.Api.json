@@ -593,6 +593,119 @@
           }
         }
       }
+    },
+    "/api/v1/import/letterboxd": {
+      "post": {
+        "tags": [
+          "StartLetterboxdImport"
+        ],
+        "summary": "Import a Letterboxd export",
+        "description": "Accepts a Letterboxd CSV export (watched, ratings or diary), parses it, and queues it for matching against TMDb. Returns a job to poll.",
+        "operationId": "StartLetterboxdImport",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/import/{jobId}": {
+      "get": {
+        "tags": [
+          "GetImportStatus"
+        ],
+        "summary": "Check an import",
+        "description": "Reports the status and progress of a Letterboxd import.",
+        "operationId": "GetImportStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -733,6 +846,87 @@
             }
           }
         }
+      },
+      "IFormFile": {
+        "type": "string",
+        "format": "binary"
+      },
+      "ImportJobStatusResponse": {
+        "required": [
+          "id",
+          "status",
+          "totalItems",
+          "matchedItems",
+          "ambiguousItems",
+          "unresolvedItems",
+          "skippedRows",
+          "failureReason",
+          "createdAt",
+          "completedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The job, to poll.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Pending, Running, Completed or Failed."
+          },
+          "totalItems": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Rows parsed out of the export.",
+            "format": "int32"
+          },
+          "matchedItems": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Rows resolved to a film and applied.",
+            "format": "int32"
+          },
+          "ambiguousItems": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Rows needing a person to choose between candidates.",
+            "format": "int32"
+          },
+          "unresolvedItems": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Rows nothing plausible was found for.",
+            "format": "int32"
+          },
+          "skippedRows": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Rows in the file that carried no title and could not be matched.",
+            "format": "int32"
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the import failed, when it did."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the export was uploaded.",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the import finished, if it has.",
+            "format": "date-time"
+          }
+        },
+        "description": "How an import is going."
       },
       "LoginUserRequest": {
         "required": [
@@ -1315,6 +1509,12 @@
     },
     {
       "name": "GetMyRatings"
+    },
+    {
+      "name": "StartLetterboxdImport"
+    },
+    {
+      "name": "GetImportStatus"
     }
   ]
 }
