@@ -27,6 +27,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Letterboxd exports are CSV, and film titles contain commas, quotes and
+      non-ASCII characters ("Crouching Tiger, Hidden Dragon", "WALL-E").
+      Hand-rolling a parser to avoid a dependency is a false economy: the failure
+      mode is not a crash but silently mis-split rows, which would attach a rating
+      to the wrong film.
+    -->
+    <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
     <!--
       Token validation, per ADR-0003: verifying a JWT signature is a
