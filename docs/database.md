@@ -292,18 +292,24 @@ UpdatedAt
 
 ## Implementation notes
 
-Not yet built. Two corrections are required when it is:
+**Built.** See [ADR-0006](adr/0006-ratings-and-watch-history.md) for the reasoning;
+the table above is the original sketch and differs from what shipped:
 
-- **`Source` is missing.** `WatchHistory` has one and `Rating` does not, yet
-  ratings arrive from at least two paths — Letterboxd import and native entry in
-  NextMovie. Without provenance, a re-import cannot tell an imported rating from
-  one the user typed, and will silently overwrite the latter.
-- **`(UserId, MovieId)` needs a unique constraint.** Nothing currently stops one
-  user holding two ratings for the same film.
-
-The scale must also be fixed and converted at the boundary: Letterboxd is 0.5–5.0
-in half-steps (see `spikes/letterboxd-tmdb-matching.md`), and `user-flows.md`
-shows five stars.
+- **`Source` was added** (`Native`, `LetterboxdImport`). The sketch gave one to
+  `WatchHistory` and not to `Rating`, which would have let a re-import silently
+  overwrite a hand-entered rating.
+- **`(UserId, MovieId)` is unique.** One opinion per person per film; re-rating
+  updates the row.
+- **The scale is 0.5–5.0 in half-steps**, stored as `numeric(2,1)` with a check
+  constraint pinning both the range and the step. Identical to Letterboxd's, so
+  import is a copy rather than a lossy conversion.
+- **`Review` was not built.** Nothing consumes it yet, and a text column nobody
+  reads is a migration waiting to be undone.
+- **`WatchedDate` became `WatchedOn`, nullable, and a date rather than a
+  timestamp.** "I have seen this, I do not remember when" is a real state that
+  `ratings.csv` produces on every row.
+- Rating a film **creates a viewing** if there is none, so "have they seen it"
+  and "what do they think of it" cannot disagree.
 
 ---
 

@@ -1,6 +1,6 @@
 # ADR-0006: Ratings and watch history
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-10
 
 ## Context

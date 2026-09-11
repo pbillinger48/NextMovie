@@ -188,6 +188,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/movies/{id}/rating": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rate a film
+         * @description Records the signed-in user's rating of a film, on a 0.5–5.0 half-star scale. Rating a film also records that it was watched.
+         */
+        put: operations["RateMovie"];
+        post?: never;
+        /**
+         * Remove a rating
+         * @description Removes the signed-in user's rating of a film. The film stays in their watch history.
+         */
+        delete: operations["UnrateMovie"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the signed-in user's ratings
+         * @description Returns rated films, most recently rated first.
+         */
+        get: operations["GetMyRatings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -309,6 +353,24 @@ export interface components {
             /** @description Genre names, alphabetically. */
             genres: string[];
         };
+        /** @description The signed-in user's rating of a film. */
+        MovieRating: {
+            /**
+             * Format: uuid
+             * @description The film rated.
+             */
+            movieId: string;
+            /**
+             * Format: double
+             * @description 0.5 to 5.0, in half-stars.
+             */
+            rating: number;
+            /**
+             * Format: date-time
+             * @description When the rating was last set or changed.
+             */
+            ratedAt: string;
+        };
         /** @description Summary view of a film. */
         MovieSummary: {
             /**
@@ -340,6 +402,11 @@ export interface components {
             /** @description Genre names, alphabetically. */
             genres: string[];
         };
+        /** @description A page of the user's ratings. */
+        MyRatingsResponse: {
+            /** @description Rated films, most recently rated first. */
+            ratings: components["schemas"]["RatedMovie"][];
+        };
         ProblemDetails: {
             type?: null | string;
             title?: null | string;
@@ -347,6 +414,41 @@ export interface components {
             status?: null | number;
             detail?: null | string;
             instance?: null | string;
+        };
+        /** @description A film the user has rated. */
+        RatedMovie: {
+            /**
+             * Format: uuid
+             * @description NextMovie identifier.
+             */
+            movieId: string;
+            /** @description Display title. */
+            title: string;
+            /** @description Relative TMDb poster path. */
+            posterPath: null | string;
+            /**
+             * Format: date
+             * @description Release date, when known.
+             */
+            releaseDate: null | string;
+            /**
+             * Format: double
+             * @description 0.5 to 5.0, in half-stars.
+             */
+            rating: number;
+            /**
+             * Format: date-time
+             * @description When the rating was last set or changed.
+             */
+            ratedAt: string;
+        };
+        /** @description A rating to record. */
+        RateMovieRequest: {
+            /**
+             * Format: double
+             * @description 0.5 to 5.0, in half-stars.
+             */
+            rating: null | number;
         };
         /** @description The refresh token to exchange. */
         RefreshSessionRequest: {
@@ -771,6 +873,117 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RateMovie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RateMovieRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovieRating"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UnrateMovie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetMyRatings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyRatingsResponse"];
                 };
             };
             /** @description Unauthorized */

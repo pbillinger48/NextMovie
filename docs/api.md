@@ -368,6 +368,68 @@ GET
 
 ---
 
+# Ratings
+
+All rating endpoints require `Authorization: Bearer {token}` and act on the
+account the token belongs to. Ratings use a **0.5–5.0 half-star scale**
+([ADR-0006](adr/0006-ratings-and-watch-history.md)) — deliberately not TMDb's
+0–10, which is the community rating on the film itself and a different quantity.
+
+## Rate a film
+
+`PUT /api/v1/movies/{id}/rating`
+
+```json
+{ "rating": 4.5 }
+```
+
+`PUT`, not `POST`: a person holds one opinion of a film at a time, so sending the
+same rating twice leaves them rating it once.
+
+`200 OK`:
+
+```json
+{
+  "movieId": "0199...",
+  "rating": 4.5,
+  "ratedAt": "2026-09-10T12:00:00+00:00"
+}
+```
+
+| Status | When |
+|---|---|
+| `400` | Outside 0.5–5.0, or not a whole or half star. |
+| `401` | Not signed in. |
+| `404` | No film with that identifier is in the catalogue. |
+
+**Rating a film also records that it was watched**, with an unknown date, if no
+viewing exists. Rating something means you have seen it, and a recommender that
+kept suggesting films you had rated would be plainly broken.
+
+---
+
+## Remove a rating
+
+`DELETE /api/v1/movies/{id}/rating`
+
+`204 No Content`, always — including when there was no rating to remove, since
+deleting twice is not an error.
+
+The film **stays in your watch history**. Changing your mind about a rating is not
+a claim that you never saw it.
+
+---
+
+## Your ratings
+
+`GET /api/v1/users/me/ratings`
+
+Returns rated films, most recently rated first, capped at 200 for now. Each entry
+carries the title, poster path and release date alongside the rating, so a list
+renders without a request per row.
+
+---
+
 # Recommendations
 
 ## Tonight's Recommendation
