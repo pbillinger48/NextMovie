@@ -1,87 +1,156 @@
 namespace NextMovie.Api.Domain.Recommendations;
 
 /// <summary>
-/// Turns a person's ratings into a description of what they like.
+/// Turns viewing and rating history into a description of what someone wants to watch.
 /// </summary>
 /// <remarks>
-/// Pure, and takes the ratings rather than fetching them, so it can be run
-/// against a real library and the result read by a human — which is the only
-/// useful test of whether a taste model says anything true.
+/// Pure, and takes the history rather than fetching it, so it can be run against a
+/// real library and the result read by a person — which is the only test of
+/// whether a taste model says anything true. That test is how the first version of
+/// this was found to be wrong.
 /// </remarks>
 public static class TasteProfileBuilder
 {
     /// <summary>
-    /// How strongly a genre is pulled back toward the user's overall average when
-    /// there is little evidence for it.
+    /// How much of affinity comes from what someone watches rather than how they
+    /// rate it.
     /// </summary>
     /// <remarks>
-    /// One five-star horror film does not mean somebody loves horror. This is
-    /// shrinkage: a genre's affinity is diluted by a notional five ratings at the
-    /// user's own average, so a genre needs real weight of evidence before it
-    /// moves. Without it, the genres a person has barely watched dominate the
-    /// ranking — which is precisely backwards.
+    /// Appetite leads because it is the less corruptible signal. Ratings measure
+    /// critical judgement, which is not the same as appetite: people reserve five
+    /// stars for films they admire and hand out threes to films they happily
+    /// watch ten of. Choosing to watch ninety-seven animated films is a clearer
+    /// statement of interest than the average score those films received.
+    /// <para>
+    /// Upside still matters, which is why it is not zero: within the genres
+    /// somebody watches, how often the good ones land should decide how readily
+    /// we recommend them.
+    /// </para>
     /// </remarks>
-    private const double GenreShrinkage = 5.0;
+    private const double AppetiteShare = 0.6;
 
     /// <summary>
-    /// The rating at which a film counts as "liked" for working out preferred
-    /// runtimes and eras.
+    /// Notional ratings added to each genre at the user's own rate, so a genre
+    /// needs weight of evidence before its upside moves.
     /// </summary>
     /// <remarks>
-    /// Preferences are taken from what someone rates well, not from everything
-    /// they have seen. A person who watched a great many bad three-hour films is
-    /// not thereby a fan of three-hour films.
+    /// One five-star horror film is not a passion for horror. Without this, the
+    /// genres somebody has barely seen dominate — which is precisely backwards.
     /// </remarks>
+    private const double UpsideShrinkage = 8.0;
+
+    /// <summary>The rating at which a film counts as loved.</summary>
+    private const decimal LovedThreshold = 4.5m;
+
+    /// <summary>The rating at which a film counts as liked, for runtime and era preferences.</summary>
     private const decimal LikedThreshold = 4.0m;
 
-    /// <summary>
-    /// Builds a profile. Returns <see cref="TasteProfile.Empty"/> when there is
-    /// nothing to learn from.
-    /// </summary>
-    public static TasteProfile Build(IReadOnlyList<RatedFilm> ratings)
+    /// <summary>Builds a profile from everything known about a person's viewing.</summary>
+    /// <param name="ratings">Films they have rated.</param>
+    /// <param name="watched">
+    /// Films they have watched, rated or not. Usually a superset of the ratings,
+    /// and the source of appetite.
+    /// </param>
+    public static TasteProfile Build(
+        IReadOnlyList<RatedFilm> ratings,
+        IReadOnlyList<WatchedFilm> watched)
     {
-        if (ratings.Count == 0)
+        if (ratings.Count == 0 && watched.Count == 0)
         {
             return TasteProfile.Empty;
         }
 
-        var average = (double)ratings.Average(film => film.Rating);
+        var appetite = Appetite(watched);
+        var upside = Upside(ratings);
+
+        var genres = appetite.Keys.Union(upside.Keys).ToList();
+
+        var affinity = genres.ToDictionary(
+            genreId => genreId,
+            genreId => (AppetiteShare * appetite.GetValueOrDefault(genreId, 0))
+                + ((1 - AppetiteShare) * upside.GetValueOrDefault(genreId, TasteProfile.NoOpinion)));
+
         var liked = ratings.Where(film => film.Rating >= LikedThreshold).ToList();
 
         return new TasteProfile(
-            GenreAffinity: GenreAffinity(ratings, average),
-            AverageRating: average,
+            GenreAffinity: affinity,
+            GenreAppetite: appetite,
+            GenreUpside: upside,
+            AverageRating: ratings.Count == 0 ? 0 : (double)ratings.Average(film => film.Rating),
             RatedFilms: ratings.Count,
-
-            // Preferences come from liked films; with too few of those there is
-            // no preference to state, and inventing one would put a confident
-            // number on noise.
             PreferredRuntimes: MiddleRange(liked.Select(film => film.Runtime)),
             PreferredEra: MiddleRange(liked.Select(film => film.ReleaseYear)));
     }
 
     /// <summary>
-    /// How much better or worse than usual this person rates each genre.
+    /// How much of someone's viewing each genre accounts for, relative to the
+    /// genre they watch most.
     /// </summary>
     /// <remarks>
-    /// Measured against their own average rather than an absolute scale, because
-    /// people use the scale differently: someone whose mean is 4.2 is not
-    /// enthusiastic about everything, they are generous. Affinity is the
-    /// deviation from their own baseline, shrunk toward it by
-    /// <see cref="GenreShrinkage"/>.
+    /// Log-scaled, because the gap between eleven films and ninety-seven matters
+    /// far more than the gap between two hundred and three hundred: the first is
+    /// the difference between dabbling and pursuing, the second is just volume.
     /// </remarks>
-    private static Dictionary<int, double> GenreAffinity(
-        IReadOnlyList<RatedFilm> ratings,
-        double average)
+    private static Dictionary<int, double> Appetite(IReadOnlyList<WatchedFilm> watched)
     {
-        var totals = new Dictionary<int, (double Sum, int Count)>();
+        var counts = new Dictionary<int, int>();
+
+        foreach (var genreId in watched.SelectMany(film => film.GenreIds.Distinct()))
+        {
+            counts[genreId] = counts.GetValueOrDefault(genreId) + 1;
+        }
+
+        if (counts.Count == 0)
+        {
+            return counts.ToDictionary(entry => entry.Key, _ => TasteProfile.NoOpinion);
+        }
+
+        var ceiling = Math.Log(counts.Values.Max() + 1);
+
+        return counts.ToDictionary(
+            entry => entry.Key,
+            entry => ceiling <= 0 ? TasteProfile.NoOpinion : Math.Log(entry.Value + 1) / ceiling);
+    }
+
+    /// <summary>
+    /// How reliably each genre produces a film this person loves, relative to how
+    /// often they love anything.
+    /// </summary>
+    /// <remarks>
+    /// Measured against their own rate rather than an absolute one, because
+    /// people differ in how freely they award top marks. A genre at exactly their
+    /// usual rate scores <see cref="TasteProfile.NoOpinion"/>; twice their usual
+    /// rate reaches the top of the scale.
+    /// </remarks>
+    private static Dictionary<int, double> Upside(IReadOnlyList<RatedFilm> ratings)
+    {
+        if (ratings.Count == 0)
+        {
+            return [];
+        }
+
+        var overall = (double)ratings.Count(film => film.Rating >= LovedThreshold) / ratings.Count;
+
+        if (overall <= 0)
+        {
+            // Nothing has ever been loved, so nothing distinguishes the genres.
+            return ratings
+                .SelectMany(film => film.GenreIds)
+                .Distinct()
+                .ToDictionary(genreId => genreId, _ => TasteProfile.NoOpinion);
+        }
+
+        var totals = new Dictionary<int, (int Loved, int Rated)>();
 
         foreach (var film in ratings)
         {
             foreach (var genreId in film.GenreIds.Distinct())
             {
                 var current = totals.GetValueOrDefault(genreId);
-                totals[genreId] = (current.Sum + (double)film.Rating, current.Count + 1);
+
+                totals[genreId] = (
+                    current.Loved + (film.Rating >= LovedThreshold ? 1 : 0),
+                    current.Rated + 1);
             }
         }
 
@@ -89,13 +158,11 @@ public static class TasteProfileBuilder
             entry => entry.Key,
             entry =>
             {
-                var (sum, count) = entry.Value;
+                var (loved, rated) = entry.Value;
+                var shrunk = (loved + (overall * UpsideShrinkage)) / (rated + UpsideShrinkage);
 
-                // The shrunk mean: (observed total + prior) / (observed + prior
-                // weight), then expressed as a deviation from the baseline.
-                var shrunkMean = (sum + (average * GenreShrinkage)) / (count + GenreShrinkage);
-
-                return shrunkMean - average;
+                // Their own rate sits at the middle of the scale; twice it, at the top.
+                return Math.Clamp(shrunk / (2 * overall), 0, 1);
             });
     }
 
@@ -103,11 +170,9 @@ public static class TasteProfileBuilder
     /// The middle half of a set of values, as a range.
     /// </summary>
     /// <remarks>
-    /// The interquartile range rather than a mean and standard deviation: film
-    /// runtimes and release years are not normally distributed — one silent film
-    /// or one four-hour epic would drag a mean somewhere unrepresentative — and
-    /// the middle half describes "what they usually watch" without being at the
-    /// mercy of the extremes.
+    /// The interquartile range rather than a mean and standard deviation: runtimes
+    /// and release years are not normally distributed, and one silent film or one
+    /// four-hour epic would drag a mean somewhere unrepresentative.
     /// </remarks>
     private static Range<int>? MiddleRange(IEnumerable<int?> values)
     {

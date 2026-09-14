@@ -21,24 +21,41 @@ public static class RecommendationScorer
     /// How much each signal contributes. They sum to 1.
     /// </summary>
     /// <remarks>
-    /// Genre affinity dominates because it is the only signal that is genuinely
-    /// about <em>this person</em>; the rest describe the film. Community rating
-    /// is second because a film someone would like on genre alone but that is
-    /// poorly made should not be recommended — it acts as a quality prior.
-    /// Popularity is deliberately weak and effectively a tiebreak: ranking by it
-    /// would just recommend blockbusters to everyone.
+    /// Taste is about <em>this person</em>; quality is about the film; the
+    /// interaction between them is where most of the signal actually lives.
+    /// Popularity is deliberately the smallest: ranking by it would recommend the
+    /// same films to everybody.
     /// </remarks>
-    public const double GenreWeight = 0.50;
-    public const double CommunityRatingWeight = 0.20;
-    public const double RuntimeWeight = 0.10;
-    public const double EraWeight = 0.10;
-    public const double PopularityWeight = 0.10;
+    public const double TasteWeight = 0.35;
+    public const double QualityWeight = 0.15;
 
     /// <summary>
-    /// The affinity, in rating points, at which a genre counts as a strong
-    /// preference worth mentioning.
+    /// What a good film in a genre you actually watch is worth, beyond the two
+    /// separately.
     /// </summary>
-    private const double NotableAffinity = 0.25;
+    /// <remarks>
+    /// The largest single weight, and the correction that matters most. Added
+    /// independently, taste and quality let a well-reviewed film be dragged down
+    /// by a genre score and a genre you love be filled with mediocrity.
+    /// Multiplied, they say the thing we actually mean: recommend the <em>good
+    /// ones</em> from the kinds of film this person watches. It is why a
+    /// well-reviewed animated film now ranks where it should for someone with
+    /// ninety-seven animated films behind them.
+    /// </remarks>
+    public const double InteractionWeight = 0.30;
+
+    public const double RuntimeWeight = 0.07;
+    public const double EraWeight = 0.08;
+    public const double PopularityWeight = 0.05;
+
+    /// <summary>
+    /// The affinity above which a genre is worth naming as a reason.
+    /// </summary>
+    /// <remarks>
+    /// Affinity runs 0–1 with a half meaning no opinion, so this is "clearly
+    /// above indifference" rather than merely non-negative.
+    /// </remarks>
+    private const double NotableAffinity = 0.6;
 
     /// <summary>Ratings needed before a recommendation is called confident.</summary>
     private const int ConfidentRatings = 100;
@@ -51,15 +68,16 @@ public static class RecommendationScorer
         TasteProfile profile,
         IReadOnlyDictionary<int, string> genreNames)
     {
-        var genre = GenreScore(candidate, profile);
-        var community = CommunityScore(candidate);
+        var taste = GenreScore(candidate, profile);
+        var quality = CommunityScore(candidate);
         var runtime = RangeScore(candidate.Runtime, profile.PreferredRuntimes, tolerance: 30);
         var era = RangeScore(candidate.ReleaseYear, profile.PreferredEra, tolerance: 15);
         var popularity = PopularityScore(candidate);
 
         var score =
-            (genre * GenreWeight)
-            + (community * CommunityRatingWeight)
+            (taste * TasteWeight)
+            + (quality * QualityWeight)
+            + (taste * quality * InteractionWeight)
             + (runtime * RuntimeWeight)
             + (era * EraWeight)
             + (popularity * PopularityWeight);
@@ -86,16 +104,13 @@ public static class RecommendationScorer
         {
             // Nothing known either way. Neutral, not zero — zero would rank an
             // unknown film below one the user actively dislikes.
-            return 0.5;
+            return TasteProfile.NoOpinion;
         }
 
-        var affinities = candidate.GenreIds
-            .Select(genreId => profile.GenreAffinity.GetValueOrDefault(genreId, 0))
-            .ToList();
-
-        // Affinity is a deviation in rating points, realistically within ±1.5.
-        // Mapped onto 0–1 with 0.5 as "no opinion".
-        return Math.Clamp(0.5 + (affinities.Average() / 3.0), 0, 1);
+        // Averaged across the film's genres rather than taking the best: a film
+        // that is half something the user avoids is a worse bet than one wholly
+        // in a genre they seek out, and the maximum would rate them the same.
+        return Math.Clamp(candidate.GenreIds.Select(profile.AffinityFor).Average(), 0, 1);
     }
 
     private static double CommunityScore(RecommendationCandidate candidate) =>
@@ -162,8 +177,8 @@ public static class RecommendationScorer
         var reasons = new List<string>();
 
         var strongGenres = candidate.GenreIds
-            .Where(genreId => profile.GenreAffinity.GetValueOrDefault(genreId, 0) >= NotableAffinity)
-            .OrderByDescending(genreId => profile.GenreAffinity[genreId])
+            .Where(genreId => profile.AffinityFor(genreId) >= NotableAffinity)
+            .OrderByDescending(profile.AffinityFor)
             .Select(genreId => genreNames.GetValueOrDefault(genreId))
             .OfType<string>()
             .Take(2)
@@ -171,7 +186,10 @@ public static class RecommendationScorer
 
         if (strongGenres.Count > 0)
         {
-            reasons.Add($"You rate {string.Join(" and ", strongGenres)} higher than average");
+            // Phrased as what they watch, not how they score it. The affinity
+            // behind this is mostly appetite, and claiming they "rate it highly"
+            // would be a reason that does not match the evidence.
+            reasons.Add($"You watch a lot of {string.Join(" and ", strongGenres)}");
         }
 
         if (runtimeScore >= 1.0 && candidate.Runtime is { } runtime)

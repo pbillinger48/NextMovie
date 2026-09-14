@@ -17,22 +17,30 @@ public sealed class RecommendationScorerTests
     private const int SciFi = 878;
     private const int Horror = 27;
     private const int Documentary = 99;
+    private const int Animation = 16;
 
     private static readonly Dictionary<int, string> GenreNames = new()
     {
         [SciFi] = "Science Fiction",
         [Horror] = "Horror",
         [Documentary] = "Documentary",
+        [Animation] = "Animation",
     };
 
-    /// <summary>Somebody who loves science fiction, dislikes horror, watches 2-hour modern films.</summary>
+    /// <summary>Somebody who seeks out science fiction, avoids horror, watches 2-hour modern films.</summary>
     private static TasteProfile SciFiFan(int ratedFilms = 200)
     {
         var ratings = new List<RatedFilm>();
-        ratings.AddRange(Enumerable.Repeat(new RatedFilm(4.8m, [SciFi], 120, 2016), ratedFilms / 2));
-        ratings.AddRange(Enumerable.Repeat(new RatedFilm(1.5m, [Horror], 95, 2016), ratedFilms / 2));
+        ratings.AddRange(Enumerable.Repeat(new RatedFilm(4.8m, [SciFi], 120, 2016), ratedFilms * 3 / 4));
+        ratings.AddRange(Enumerable.Repeat(new RatedFilm(1.5m, [Horror], 95, 2016), ratedFilms / 4));
 
-        return TasteProfileBuilder.Build(ratings);
+        // Watched in the same proportion they were rated: this person chooses
+        // science fiction and rarely reaches for horror.
+        var watched = new List<WatchedFilm>();
+        watched.AddRange(Enumerable.Repeat(new WatchedFilm([SciFi]), ratedFilms * 3 / 4));
+        watched.AddRange(Enumerable.Repeat(new WatchedFilm([Horror]), ratedFilms / 4));
+
+        return TasteProfileBuilder.Build(ratings, watched);
     }
 
     private static RecommendationCandidate Candidate(
@@ -190,6 +198,54 @@ public sealed class RecommendationScorerTests
         var recommendation = RecommendationScorer.Score(Candidate(Documentary), SciFiFan(400), GenreNames);
 
         Assert.Equal(RecommendationConfidence.Low, recommendation.Confidence);
+    }
+
+    [Fact]
+    public void A_good_film_in_a_genre_you_watch_widely_ranks_above_a_mediocre_one()
+    {
+        // The correction this model exists for. Somebody with a hundred animated
+        // films behind them should be recommended the good ones, not told they
+        // dislike animation.
+        var breadthWatcher = TasteProfileBuilder.Build(
+            [
+                .. Enumerable.Repeat(new RatedFilm(3.2m, [Animation], 100, 2016), 90),
+                .. Enumerable.Repeat(new RatedFilm(5.0m, [Animation], 100, 2016), 10),
+            ],
+            [.. Enumerable.Repeat(new WatchedFilm([Animation]), 100)]);
+
+        var acclaimed = RecommendationScorer.Score(
+            new RecommendationCandidate(Guid.CreateVersion7(), [Animation], 100, 2016, 8.6, 60),
+            breadthWatcher,
+            GenreNames);
+
+        var forgettable = RecommendationScorer.Score(
+            new RecommendationCandidate(Guid.CreateVersion7(), [Animation], 100, 2016, 5.2, 60),
+            breadthWatcher,
+            GenreNames);
+
+        Assert.True(
+            acclaimed.Score > forgettable.Score,
+            $"acclaimed {acclaimed.Score:0.000} vs forgettable {forgettable.Score:0.000}");
+
+        // And it is actually recommendable, not merely better than the bad one.
+        Assert.True(acclaimed.Score > 0.6, $"acclaimed scored only {acclaimed.Score:0.000}");
+    }
+
+    [Fact]
+    public void Quality_matters_more_inside_a_genre_you_watch_than_outside_it()
+    {
+        var profile = SciFiFan();
+
+        var gainInLovedGenre =
+            RecommendationScorer.Score(Candidate(SciFi, community: 8.5), profile, GenreNames).Score
+            - RecommendationScorer.Score(Candidate(SciFi, community: 5.0), profile, GenreNames).Score;
+
+        var gainInAvoidedGenre =
+            RecommendationScorer.Score(Candidate(Horror, community: 8.5), profile, GenreNames).Score
+            - RecommendationScorer.Score(Candidate(Horror, community: 5.0), profile, GenreNames).Score;
+
+        // The interaction term: a great film is worth more in a genre you watch.
+        Assert.True(gainInLovedGenre > gainInAvoidedGenre);
     }
 
     [Fact]
