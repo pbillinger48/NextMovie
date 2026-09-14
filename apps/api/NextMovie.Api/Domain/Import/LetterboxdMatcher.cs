@@ -124,14 +124,19 @@ public static class LetterboxdMatcher
     /// Reduces a title to a form two sources can be compared on.
     /// </summary>
     /// <remarks>
-    /// Case, surrounding whitespace, accents and a leading article are all places
-    /// where two catalogues legitimately disagree about the same film. Everything
-    /// else is left alone: the more this normalises, the more different films it
-    /// can collide, and a collision here is a wrong match.
+    /// Case, surrounding whitespace, accents, punctuation style and a leading
+    /// article are all places where two catalogues legitimately disagree about
+    /// the same film while meaning the same film. Everything else is left alone:
+    /// the more this normalises, the more different films it can collide, and a
+    /// collision here is a wrong match.
+    /// <para>
+    /// Every rule here was put in by a real failure against a real 796-film
+    /// library, not anticipated. Adding one on a hunch is how collisions get in.
+    /// </para>
     /// </remarks>
     internal static string Normalize(string title)
     {
-        var folded = FoldTrailingArticle(title.Trim());
+        var folded = FoldLeadingArticle(FoldTrailingArticle(title.Trim()));
 
         // Strip diacritics so "Amelie" matches "Amélie", then compare in lower
         // case and with runs of whitespace collapsed.
@@ -158,10 +163,63 @@ public static class LetterboxdMatcher
             }
 
             lastWasSpace = false;
-            builder.Append(char.ToLowerInvariant(character));
+            builder.Append(char.ToLowerInvariant(FoldPunctuation(character)));
         }
 
         return builder.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Collapses typographic punctuation onto its plain ASCII equivalent.
+    /// </summary>
+    /// <remarks>
+    /// Letterboxd writes <c>Mission: Impossible – Fallout</c> with an en dash;
+    /// TMDb writes the same film with a hyphen. Eleven films in one real library
+    /// failed on that single character — Mission: Impossible, Star Wars, John
+    /// Wick and The Hunger Games all use it.
+    /// <para>
+    /// Purely orthographic, so it cannot collide two genuinely different films:
+    /// no pair of films differs only in which dash or apostrophe someone typed.
+    /// </para>
+    /// </remarks>
+    private static char FoldPunctuation(char character) => character switch
+    {
+        // En dash, em dash, figure dash, minus sign, non-breaking hyphen.
+        '\u2013' or '\u2014' or '\u2012' or '\u2212' or '\u2011' => '-',
+
+        // Curly quotes, which Letterboxd and TMDb also disagree about.
+        '\u2018' or '\u2019' => '\'',
+        '\u201C' or '\u201D' => '"',
+
+        _ => character,
+    };
+
+    /// <summary>
+    /// Drops a leading "The", "A" or "An".
+    /// </summary>
+    /// <remarks>
+    /// The spike's third heuristic, and one this originally got wrong by folding
+    /// trailing articles instead. Letterboxd has <c>School of Rock</c> where TMDb
+    /// has <c>The School of Rock</c>; neither is wrong, and both mean the film
+    /// everyone calls School of Rock.
+    /// <para>
+    /// Applied to both sides, so the comparison never privileges one catalogue's
+    /// house style. It could in principle collide two films differing only by a
+    /// leading article — the year and vote-count rules still stand behind it, and
+    /// no such pair turned up in 796 real films.
+    /// </para>
+    /// </remarks>
+    private static string FoldLeadingArticle(string title)
+    {
+        foreach (var article in (string[])["The ", "A ", "An "])
+        {
+            if (title.StartsWith(article, StringComparison.OrdinalIgnoreCase))
+            {
+                return title[article.Length..];
+            }
+        }
+
+        return title;
     }
 
     /// <summary>

@@ -220,6 +220,60 @@ public sealed class LetterboxdMatcherTests
             LetterboxdMatcher.Match(Entry("Amelie", year: 2001), [Candidate(194, "Amélie", year: 2001)]));
     }
 
+    [Theory]
+    // Every one of these failed against a real 796-film library. Letterboxd
+    // writes an en dash where TMDb writes a hyphen, and eleven films turned on
+    // that single character.
+    [InlineData("Mission: Impossible \u2013 Fallout", "Mission: Impossible - Fallout")]
+    [InlineData("John Wick: Chapter 3 \u2013 Parabellum", "John Wick: Chapter 3 - Parabellum")]
+    [InlineData("Star Wars: Episode I \u2013 The Phantom Menace", "Star Wars: Episode I - The Phantom Menace")]
+    [InlineData("The Hunger Games: Mockingjay \u2013 Part 1", "The Hunger Games: Mockingjay - Part 1")]
+    public void Ignores_which_dash_a_catalogue_uses(string exported, string tmdbTitle)
+    {
+        Assert.IsType<MatchOutcome.Matched>(
+            LetterboxdMatcher.Match(Entry(exported), [Candidate(1, tmdbTitle)]));
+    }
+
+    [Theory]
+    [InlineData("Everything\u2019s Gonna Be All Right", "Everything's Gonna Be All Right")]
+    [InlineData("Everything's Gonna Be All Right", "Everything\u2019s Gonna Be All Right")]
+    public void Ignores_which_apostrophe_a_catalogue_uses(string exported, string tmdbTitle)
+    {
+        Assert.IsType<MatchOutcome.Matched>(
+            LetterboxdMatcher.Match(Entry(exported), [Candidate(1, tmdbTitle)]));
+    }
+
+    [Theory]
+    // The spike's third heuristic, which this originally got wrong by folding
+    // trailing articles instead. Letterboxd has "School of Rock"; TMDb has
+    // "The School of Rock".
+    [InlineData("School of Rock", "The School of Rock")]
+    [InlineData("The School of Rock", "School of Rock")]
+    [InlineData("A Quiet Place", "Quiet Place")]
+    public void Ignores_a_leading_article_either_side(string exported, string tmdbTitle)
+    {
+        Assert.IsType<MatchOutcome.Matched>(
+            LetterboxdMatcher.Match(Entry(exported, year: 2003), [Candidate(1, tmdbTitle, year: 2003)]));
+    }
+
+    [Fact]
+    public void Still_folds_a_trailing_article()
+    {
+        // Both folds apply, so "Matrix, The" reaches the same key as "The Matrix"
+        // and as "Matrix".
+        Assert.IsType<MatchOutcome.Matched>(
+            LetterboxdMatcher.Match(Entry("Matrix, The", year: 1999), [Candidate(603, "Matrix", year: 1999)]));
+    }
+
+    [Fact]
+    public void Does_not_collide_films_that_differ_by_more_than_punctuation()
+    {
+        // The normalisation is orthographic only. Two genuinely different films
+        // must stay different, or the whole design's promise is broken.
+        Assert.IsType<MatchOutcome.Unresolved>(
+            LetterboxdMatcher.Match(Entry("The Thing Called Love"), [Candidate(1, "The Thing")]));
+    }
+
     [Fact]
     public void Matches_a_title_that_tmdb_carries_with_a_subtitle()
     {
