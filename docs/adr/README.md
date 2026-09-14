@@ -25,6 +25,7 @@ Where an ADR and `docs/` disagree, **the ADR wins** — the product docs predate
 | [0005](0005-verify-google-id-tokens-at-the-api.md) | Clients obtain Google ID tokens; the API verifies them | Accepted |
 | [0006](0006-ratings-and-watch-history.md) | Ratings and watch history | Accepted |
 | [0007](0007-database-backed-import-jobs.md) | Import jobs live in the database and are worked in-process | Accepted |
+| [0008](0008-recommendations-from-tmdb-relatedness.md) | Recommend from TMDb relatedness, scored against a computed taste profile | Proposed |
 
 ## Template
 
