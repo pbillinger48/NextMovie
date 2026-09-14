@@ -180,6 +180,7 @@ UpdateCurrentUser.Map(app);
 RateMovie.Map(app);
 UnrateMovie.Map(app);
 GetMyRatings.Map(app);
+GetMyMovieRating.Map(app);
 StartLetterboxdImport.Map(app);
 GetImportStatus.Map(app);
 GetImportReview.Map(app);
