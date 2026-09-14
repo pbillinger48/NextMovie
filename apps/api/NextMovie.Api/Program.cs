@@ -49,6 +49,12 @@ builder.Services.AddDbContext<NextMovieDbContext>(options => options
 builder.Services.AddScoped<MovieCatalog>();
 builder.Services.AddScoped<UserLibrary>();
 builder.Services.AddScoped<LetterboxdCsvReader>();
+builder.Services.AddScoped<LetterboxdImportProcessor>();
+
+// The queue is a table and this is what drains it (ADR-0007). Registered last of
+// the import pieces so the dependency direction is obvious: the worker needs the
+// processor, and the processor needs everything above it.
+builder.Services.AddHostedService<ImportWorker>();
 
 // Bound and validated at startup rather than on first use: a missing TMDb token
 // or signing key should stop the process immediately with a clear message, not
