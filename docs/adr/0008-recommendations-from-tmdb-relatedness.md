@@ -1,6 +1,6 @@
 # ADR-0008: Recommend from TMDb relatedness, scored against a computed taste profile
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-14
 
 ## Context
