@@ -273,7 +273,13 @@ internal sealed class LetterboxdImportProcessor(
         CancellationToken cancellationToken)
     {
         var now = time.GetUtcNow();
-        var entry = new LetterboxdEntry(item.Name, item.Year, item.FilmUri, item.Rating, item.WatchedOn);
+        var entry = new LetterboxdEntry(
+            item.Name,
+            item.Year,
+            item.FilmUri,
+            item.Rating,
+            item.WatchedOn,
+            item.IsLoggedViewing);
         var outcome = LetterboxdMatcher.Match(entry, candidates);
 
         item.ResolvedAt = now;
@@ -298,6 +304,7 @@ internal sealed class LetterboxdImportProcessor(
                     movie.Id,
                     item.Rating,
                     item.WatchedOn,
+                    item.IsLoggedViewing,
                     now,
                     cancellationToken);
 

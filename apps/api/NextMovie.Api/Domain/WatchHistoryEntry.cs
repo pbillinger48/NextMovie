@@ -41,5 +41,18 @@ public class WatchHistoryEntry
     /// <summary>Where this viewing came from.</summary>
     public required LibrarySource Source { get; init; }
 
+    /// <summary>
+    /// Whether this row came from something that records viewings — a Letterboxd
+    /// diary entry — rather than from a list a film merely appears on.
+    /// </summary>
+    /// <remarks>
+    /// A list gives us "they have seen this", with a date that means when the row
+    /// was created. A diary gives us "they saw this on this day". When the diary
+    /// later supplies the real date for a film we only knew from a list, it
+    /// <b>replaces</b> that row rather than adding beside it: they are the same
+    /// viewing described twice, and treating them as two invents a rewatch.
+    /// </remarks>
+    public bool IsLoggedViewing { get; set; }
+
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
 }

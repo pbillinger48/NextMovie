@@ -246,6 +246,206 @@ public sealed class LetterboxdImportProcessorTests(PostgresFixture postgres) : I
     }
 
     [Fact]
+    public async Task Listing_the_same_film_in_two_exports_does_not_invent_a_rewatch()
+    {
+        // watched.csv says when the film was added to the list; ratings.csv says
+        // when it was rated. Same film, different dates, one viewing — importing
+        // both is how 49 phantom rewatches appeared on a real library.
+        await SeedJobAsync([Row("Inception", 2010, watchedOn: new DateOnly(2022, 1, 2))]);
+
+        await using (var first = NewContext())
+        {
+            await ProcessAsync(first);
+        }
+
+        await SeedJobAsync(
+            [Row("Inception", 2010, rating: 4.5m, watchedOn: new DateOnly(2025, 7, 11))],
+            email: null);
+
+        await using (var second = NewContext())
+        {
+            await ProcessAsync(second);
+        }
+
+        await using var db = postgres.CreateContext();
+
+        Assert.Equal(1, await db.WatchHistory.CountAsync(Ct));
+
+        // The rating from the second file still lands — the point is not to
+        // ignore the row, only to stop it inventing a viewing.
+        Assert.Equal(4.5m, (await db.Ratings.SingleAsync(Ct)).Value);
+    }
+
+    [Fact]
+    public async Task A_diary_export_can_still_record_a_genuine_rewatch()
+    {
+        // diary.csv is a log of viewings, one row each. A film watched twice is
+        // two rows, and both belong in the history.
+        await SeedJobAsync(
+        [
+            Row("Inception", 2010, watchedOn: new DateOnly(2022, 1, 2), isLoggedViewing: true),
+            Row("Inception", 2010, watchedOn: new DateOnly(2025, 7, 11), isLoggedViewing: true),
+        ]);
+
+        await using var context = NewContext();
+        await ProcessAsync(context);
+
+        await using var db = postgres.CreateContext();
+
+        Assert.Equal(2, await db.WatchHistory.CountAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_diary_export_still_does_not_duplicate_the_same_viewing()
+    {
+        var watched = new DateOnly(2022, 1, 2);
+
+        await SeedJobAsync([Row("Inception", 2010, watchedOn: watched, isLoggedViewing: true)]);
+
+        await using (var first = NewContext())
+        {
+            await ProcessAsync(first);
+        }
+
+        await SeedJobAsync([Row("Inception", 2010, watchedOn: watched, isLoggedViewing: true)], email: null);
+
+        await using (var second = NewContext())
+        {
+            await ProcessAsync(second);
+        }
+
+        await using var db = postgres.CreateContext();
+
+        Assert.Equal(1, await db.WatchHistory.CountAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_diary_date_replaces_what_a_list_only_guessed_at()
+    {
+        // watched.csv gives the date the row was created; diary.csv gives the day
+        // the film was actually seen. They describe one viewing, so the diary
+        // upgrades the list row rather than sitting beside it.
+        await SeedJobAsync([Row("Inception", 2010, watchedOn: new DateOnly(2022, 1, 2))]);
+
+        await using (var list = NewContext())
+        {
+            await ProcessAsync(list);
+        }
+
+        await SeedJobAsync(
+            [Row("Inception", 2010, watchedOn: new DateOnly(2024, 4, 28), isLoggedViewing: true)],
+            email: null);
+
+        await using (var diary = NewContext())
+        {
+            await ProcessAsync(diary);
+        }
+
+        await using var db = postgres.CreateContext();
+
+        var viewing = await db.WatchHistory.SingleAsync(Ct);
+        Assert.Equal(new DateOnly(2024, 4, 28), viewing.WatchedOn);
+        Assert.True(viewing.IsLoggedViewing);
+    }
+
+    [Fact]
+    public async Task A_list_adds_nothing_to_a_film_the_diary_already_recorded()
+    {
+        // The same two files in the other order. Importing watched.csv after
+        // diary.csv must not add a second viewing either.
+        await SeedJobAsync(
+            [Row("Inception", 2010, watchedOn: new DateOnly(2024, 4, 28), isLoggedViewing: true)]);
+
+        await using (var diary = NewContext())
+        {
+            await ProcessAsync(diary);
+        }
+
+        await SeedJobAsync([Row("Inception", 2010, watchedOn: new DateOnly(2022, 1, 2))], email: null);
+
+        await using (var list = NewContext())
+        {
+            await ProcessAsync(list);
+        }
+
+        await using var db = postgres.CreateContext();
+
+        var viewing = await db.WatchHistory.SingleAsync(Ct);
+        Assert.Equal(new DateOnly(2024, 4, 28), viewing.WatchedOn);
+    }
+
+    [Fact]
+    public async Task A_second_diary_entry_still_records_a_real_rewatch()
+    {
+        // One list row, then two diary entries: the first upgrades, the second is
+        // a genuine rewatch and must land.
+        await SeedJobAsync([Row("Inception", 2010, watchedOn: new DateOnly(2022, 1, 2))]);
+
+        await using (var list = NewContext())
+        {
+            await ProcessAsync(list);
+        }
+
+        await SeedJobAsync(
+        [
+            Row("Inception", 2010, watchedOn: new DateOnly(2024, 4, 28), isLoggedViewing: true),
+            Row("Inception", 2010, watchedOn: new DateOnly(2025, 7, 11), isLoggedViewing: true),
+        ],
+            email: null);
+
+        await using (var diary = NewContext())
+        {
+            await ProcessAsync(diary);
+        }
+
+        await using var db = postgres.CreateContext();
+
+        var dates = await db.WatchHistory.Select(entry => entry.WatchedOn).ToListAsync(Ct);
+
+        Assert.Equal(2, dates.Count);
+        Assert.Contains(new DateOnly(2024, 4, 28), dates);
+        Assert.Contains(new DateOnly(2025, 7, 11), dates);
+    }
+
+    [Fact]
+    public async Task A_rewatch_survives_a_diary_date_matching_the_list_date()
+    {
+        // The list row's date often equals the first diary entry's date, because
+        // that is the day the film was added. If the duplicate check treats the
+        // list row as a logged viewing, the first diary entry is skipped, the
+        // list row stays unclaimed, and the second entry consumes it as an
+        // upgrade — silently losing a genuine rewatch. Three films in a real
+        // library did exactly this.
+        var sameDay = new DateOnly(2022, 1, 12);
+
+        await SeedJobAsync([Row("Inception", 2010, watchedOn: sameDay)]);
+
+        await using (var list = NewContext())
+        {
+            await ProcessAsync(list);
+        }
+
+        await SeedJobAsync(
+        [
+            Row("Inception", 2010, watchedOn: sameDay, isLoggedViewing: true),
+            Row("Inception", 2010, watchedOn: new DateOnly(2022, 1, 15), isLoggedViewing: true),
+        ],
+            email: null);
+
+        await using (var diary = NewContext())
+        {
+            await ProcessAsync(diary);
+        }
+
+        await using var db = postgres.CreateContext();
+        var dates = await db.WatchHistory.Select(entry => entry.WatchedOn).ToListAsync(Ct);
+
+        Assert.Equal(2, dates.Count);
+        Assert.Contains(sameDay, dates);
+        Assert.Contains(new DateOnly(2022, 1, 15), dates);
+    }
+
+    [Fact]
     public async Task A_resumed_job_does_not_redo_work_it_already_applied()
     {
         await SeedJobAsync([Row("Inception", 2010), Row("Arrival", 2016)]);
@@ -301,7 +501,9 @@ public sealed class LetterboxdImportProcessorTests(PostgresFixture postgres) : I
         string name,
         int? year,
         decimal? rating = null,
-        DateOnly? watchedOn = null) => new(name, year, $"https://boxd.it/{name.GetHashCode():x}", rating, watchedOn);
+        DateOnly? watchedOn = null,
+        bool isLoggedViewing = false) =>
+        new(name, year, $"https://boxd.it/{name.GetHashCode():x}", rating, watchedOn, isLoggedViewing);
 
     private async Task<(Guid UserId, Guid JobId)> SeedJobAsync(
         IReadOnlyList<LetterboxdEntry> rows,
@@ -337,6 +539,7 @@ public sealed class LetterboxdImportProcessorTests(PostgresFixture postgres) : I
                 FilmUri = row.FilmUri,
                 Rating = row.Rating,
                 WatchedOn = row.WatchedOn,
+                IsLoggedViewing = row.IsLoggedViewing,
             });
         }
 

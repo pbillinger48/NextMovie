@@ -61,6 +61,11 @@ internal sealed class LetterboxdCsvReader(ILogger<LetterboxdCsvReader> logger)
             return new LetterboxdCsvReadResult([], 0);
         }
 
+        // diary.csv is the only export with a separate watched date, which is
+        // exactly what distinguishes a log of viewings from a list of films.
+        var isDiary = parser.HeaderRecord?.Contains(WatchedDateColumn, StringComparer.OrdinalIgnoreCase)
+            ?? false;
+
         while (parser.Read())
         {
             var name = Field(parser, NameColumn);
@@ -85,7 +90,9 @@ internal sealed class LetterboxdCsvReader(ILogger<LetterboxdCsvReader> logger)
 
                 // diary.csv distinguishes the day a film was watched from the day
                 // the entry was logged; the plain exports only have the latter.
-                WatchedOn: ParseDate(Field(parser, WatchedDateColumn) ?? Field(parser, DateColumn))));
+                WatchedOn: ParseDate(Field(parser, WatchedDateColumn) ?? Field(parser, DateColumn)),
+
+                IsLoggedViewing: isDiary));
         }
 
         if (skipped > 0)

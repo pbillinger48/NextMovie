@@ -228,6 +228,54 @@ public sealed class ImportReviewTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Choosing_a_film_settles_it_across_every_import()
+    {
+        var setup = await SeedAsync();
+        var secondJobId = await SeedSecondImportOfAsync(setup, "Close Call", 2010);
+        using var client = await SignedInClientAsync(setup.Email);
+
+        await client.PostAsJsonAsync(
+            $"/api/v1/import/items/{setup.AmbiguousItemId}/resolve",
+            new ResolveImportItemRequest(setup.CloseCallMovieId),
+            Ct);
+
+        await using var db = postgres.CreateContext();
+
+        // Importing watched.csv and then ratings.csv queues the same unmatched
+        // film twice. Being asked the same question again because of how the
+        // export was split is the tool's problem, not the user's.
+        Assert.Equal(
+            0,
+            await db.ImportItems.CountAsync(
+                item => item.ImportJobId == secondJobId && item.Status == ImportItemStatus.Ambiguous,
+                Ct));
+
+        var secondJob = await db.ImportJobs.SingleAsync(job => job.Id == secondJobId, Ct);
+        Assert.Equal(0, secondJob.AmbiguousItems);
+        Assert.Equal(1, secondJob.MatchedItems);
+    }
+
+    [Fact]
+    public async Task Dismissing_settles_it_across_every_import_too()
+    {
+        var setup = await SeedAsync();
+        var secondJobId = await SeedSecondImportOfAsync(setup, "Squid Game", 2021);
+        using var client = await SignedInClientAsync(setup.Email);
+
+        await client.PostAsync($"/api/v1/import/items/{setup.UnresolvedItemId}/dismiss", null, Ct);
+
+        await using var db = postgres.CreateContext();
+
+        Assert.Equal(
+            0,
+            await db.ImportItems.CountAsync(
+                item => item.ImportJobId == secondJobId
+                    && (item.Status == ImportItemStatus.Ambiguous
+                        || item.Status == ImportItemStatus.Unresolved),
+                Ct));
+    }
+
     // --- dismissing ---
 
     [Fact]
@@ -320,6 +368,7 @@ public sealed class ImportReviewTests(PostgresFixture postgres) : IAsyncLifetime
             WatchedOn = new DateOnly(2022, 1, 2),
             Status = ImportItemStatus.Ambiguous,
             CandidateTmdbIds = [1, 2],
+            FilmUri = "https://boxd.it/close",
         };
 
         var unresolved = new ImportItem
@@ -328,6 +377,7 @@ public sealed class ImportReviewTests(PostgresFixture postgres) : IAsyncLifetime
             Name = "Squid Game",
             Year = 2021,
             Status = ImportItemStatus.Unresolved,
+            FilmUri = "https://boxd.it/squid",
         };
 
         job.Items.Add(matched);
@@ -355,6 +405,43 @@ public sealed class ImportReviewTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.NotNull(session);
 
         return session.User.Id;
+    }
+
+    /// <summary>A second import of the same user containing the same unmatched film.</summary>
+    private async Task<Guid> SeedSecondImportOfAsync(Setup setup, string name, int year)
+    {
+        await using var db = postgres.CreateContext();
+
+        var original = await db.ImportItems.SingleAsync(item => item.Name == name, Ct);
+        var userId = (await db.ImportJobs.SingleAsync(job => job.Id == setup.JobId, Ct)).UserId;
+
+        var job = new ImportJob
+        {
+            UserId = userId,
+            TotalItems = 1,
+            SkippedRows = 0,
+            Status = ImportJobStatus.Completed,
+            AmbiguousItems = original.Status == ImportItemStatus.Ambiguous ? 1 : 0,
+            UnresolvedItems = original.Status == ImportItemStatus.Unresolved ? 1 : 0,
+        };
+
+        job.Items.Add(new ImportItem
+        {
+            ImportJobId = job.Id,
+            Name = name,
+            Year = year,
+
+            // The same film, from the same export, with the date the second file
+            // happened to record.
+            FilmUri = original.FilmUri,
+            Status = original.Status,
+            CandidateTmdbIds = original.CandidateTmdbIds,
+        });
+
+        db.ImportJobs.Add(job);
+        await db.SaveChangesAsync(Ct);
+
+        return job.Id;
     }
 
     private async Task<HttpClient> SignedInClientAsync(string email)

@@ -83,6 +83,7 @@ internal sealed class UserLibrary(NextMovieDbContext db, ILogger<UserLibrary> lo
         Guid movieId,
         decimal? value,
         DateOnly? watchedOn,
+        bool isLoggedViewing,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -111,26 +112,102 @@ internal sealed class UserLibrary(NextMovieDbContext db, ILogger<UserLibrary> lo
             }
         }
 
-        var alreadyLogged = await db.WatchHistory.AnyAsync(
-            entry => entry.UserId == userId && entry.MovieId == movieId && entry.WatchedOn == watchedOn,
-            cancellationToken);
-
-        if (!alreadyLogged)
-        {
-            db.WatchHistory.Add(new WatchHistoryEntry
-            {
-                UserId = userId,
-                MovieId = movieId,
-                WatchedOn = watchedOn,
-                Source = LibrarySource.LetterboxdImport,
-                CreatedAt = now,
-            });
-        }
+        await RecordViewingAsync(userId, movieId, watchedOn, isLoggedViewing, now, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
 
         return !nativeRatingWins;
     }
+
+    /// <summary>
+    /// Records an imported viewing, without inventing rewatches.
+    /// </summary>
+    /// <remarks>
+    /// Three Letterboxd exports describe the same library in different ways, and
+    /// importing more than one of them must not multiply a person's viewing
+    /// history. The rules, in the order they apply:
+    /// <list type="bullet">
+    /// <item>
+    /// A <b>list</b> row (watched.csv, ratings.csv) says only "they have seen
+    /// this". If any viewing of the film exists, it adds nothing.
+    /// </item>
+    /// <item>
+    /// A <b>diary</b> row says "they saw this on this day". An existing viewing
+    /// on the same day is the same viewing. A film known only from a list gets
+    /// that row <b>upgraded</b> with the real date, because the list row and the
+    /// diary row describe one viewing, not two.
+    /// </item>
+    /// <item>
+    /// Anything else is a genuine rewatch and is inserted.
+    /// </item>
+    /// </list>
+    /// Without the upgrade rule, importing watched.csv and then diary.csv turned
+    /// 768 viewings into 1,080 on a real library — 297 films apparently watched
+    /// twice that were watched once.
+    /// </remarks>
+    private async Task RecordViewingAsync(
+        Guid userId,
+        Guid movieId,
+        DateOnly? watchedOn,
+        bool isLoggedViewing,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var existing = await db.WatchHistory
+            .Where(entry => entry.UserId == userId && entry.MovieId == movieId)
+            .ToListAsync(cancellationToken);
+
+        if (!isLoggedViewing)
+        {
+            if (existing.Count == 0)
+            {
+                db.WatchHistory.Add(NewViewing(userId, movieId, watchedOn, isLoggedViewing: false, now));
+            }
+
+            return;
+        }
+
+        // Only a *logged* viewing on the same day is a duplicate. A list row
+        // that happens to carry the same date is not — its date means "added on",
+        // and it is still waiting to be claimed by the diary entry it came from.
+        //
+        // Checking it the other way round loses viewings: the list row survives
+        // unclaimed, and the film's next diary entry consumes it as an upgrade
+        // instead of being recorded. Three films in a real library lost a genuine
+        // rewatch exactly that way.
+        if (existing.Any(entry => entry.IsLoggedViewing && entry.WatchedOn == watchedOn))
+        {
+            return;
+        }
+
+        var fromAList = existing.FirstOrDefault(entry => !entry.IsLoggedViewing);
+
+        if (fromAList is not null)
+        {
+            // The same viewing, now with the date it actually happened.
+            fromAList.WatchedOn = watchedOn;
+            fromAList.IsLoggedViewing = true;
+
+            return;
+        }
+
+        db.WatchHistory.Add(NewViewing(userId, movieId, watchedOn, isLoggedViewing: true, now));
+    }
+
+    private static WatchHistoryEntry NewViewing(
+        Guid userId,
+        Guid movieId,
+        DateOnly? watchedOn,
+        bool isLoggedViewing,
+        DateTimeOffset now) => new()
+    {
+        UserId = userId,
+        MovieId = movieId,
+        WatchedOn = watchedOn,
+        IsLoggedViewing = isLoggedViewing,
+        Source = LibrarySource.LetterboxdImport,
+        CreatedAt = now,
+    };
 
     /// <summary>
     /// Removes a user's rating of a film, if there is one.

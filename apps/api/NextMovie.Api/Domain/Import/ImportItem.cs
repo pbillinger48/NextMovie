@@ -36,6 +36,17 @@ public class ImportItem
 
     public DateOnly? WatchedOn { get; init; }
 
+    /// <summary>
+    /// Whether this row is an individual viewing (from <c>diary.csv</c>) rather
+    /// than a film on a list.
+    /// </summary>
+    /// <remarks>
+    /// Decides whether importing it may add a second viewing of the same film.
+    /// See <see cref="LetterboxdEntry.IsLoggedViewing"/> for why conflating the
+    /// two produces phantom rewatches.
+    /// </remarks>
+    public bool IsLoggedViewing { get; init; }
+
     public ImportItemStatus Status { get; set; } = ImportItemStatus.Pending;
 
     /// <summary>The film this row resolved to, once it has.</summary>
