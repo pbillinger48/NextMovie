@@ -560,6 +560,57 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "GetMyMovieRating"
+        ],
+        "summary": "Get your rating of a film",
+        "description": "Returns the signed-in user's rating of a film, if they have rated it.",
+        "operationId": "GetMyMovieRating",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieRating"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/users/me/ratings": {
@@ -1839,6 +1890,9 @@
     },
     {
       "name": "UnrateMovie"
+    },
+    {
+      "name": "GetMyMovieRating"
     },
     {
       "name": "GetMyRatings"

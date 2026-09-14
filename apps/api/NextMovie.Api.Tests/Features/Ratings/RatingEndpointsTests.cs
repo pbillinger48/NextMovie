@@ -175,6 +175,60 @@ public sealed class RatingEndpointsTests(PostgresFixture postgres) : IAsyncLifet
     }
 
     [Fact]
+    public async Task Your_rating_of_one_film_can_be_read_back()
+    {
+        var movieId = await SeedMovieAsync();
+        using var client = await SignedInClientAsync();
+        await RateAsync(client, movieId, 4.5m);
+
+        var response = await client.GetAsync($"/api/v1/movies/{movieId}/rating", Ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var rating = await response.Content.ReadFromJsonAsync<MovieRating>(Ct);
+        Assert.NotNull(rating);
+        Assert.Equal(4.5m, rating.Rating);
+    }
+
+    [Fact]
+    public async Task An_unrated_film_reports_not_rated_rather_than_zero()
+    {
+        var movieId = await SeedMovieAsync();
+        using var client = await SignedInClientAsync();
+
+        // "Not rated" and "rated zero" are different statements, and only one of
+        // them is representable.
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.GetAsync($"/api/v1/movies/{movieId}/rating", Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Reading_a_rating_requires_a_signed_in_user()
+    {
+        var movieId = await SeedMovieAsync();
+        using var client = _factory.CreateClient();
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.GetAsync($"/api/v1/movies/{movieId}/rating", Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task You_cannot_read_another_users_rating()
+    {
+        var movieId = await SeedMovieAsync();
+        using var mine = await SignedInClientAsync("mine@example.com");
+        using var theirs = await SignedInClientAsync("theirs@example.com");
+
+        await RateAsync(mine, movieId, 5.0m);
+
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await theirs.GetAsync($"/api/v1/movies/{movieId}/rating", Ct)).StatusCode);
+    }
+
+    [Fact]
     public async Task One_users_rating_is_invisible_to_another()
     {
         var movieId = await SeedMovieAsync();

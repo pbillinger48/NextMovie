@@ -408,6 +408,28 @@ kept suggesting films you had rated would be plainly broken.
 
 ---
 
+## Your rating of a film
+
+`GET /api/v1/movies/{id}/rating`
+
+```json
+{
+  "movieId": "0199...",
+  "rating": 4.5,
+  "ratedAt": "2026-09-14T12:00:00+00:00"
+}
+```
+
+`404` when you have not rated it — which is a different statement from a rating
+of zero, and only one of them is representable.
+
+Deliberately separate from the film details endpoint rather than folded into it:
+details are readable by anyone, and making an anonymous-friendly response depend
+on who is asking is how a cache eventually serves one person's opinion to
+somebody else.
+
+---
+
 ## Remove a rating
 
 `DELETE /api/v1/movies/{id}/rating`

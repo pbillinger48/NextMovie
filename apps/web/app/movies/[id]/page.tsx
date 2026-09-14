@@ -2,8 +2,12 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
+import { RatingControl } from "@/app/components/RatingControl";
 import { getMovie } from "@/lib/api";
 import { formatRuntime } from "@/lib/format";
+import { getMyRating } from "@/lib/ratings-api";
+import { getSession } from "@/lib/server-session";
+import { isSignedIn } from "@/lib/session";
 
 /**
  * A single film.
@@ -60,6 +64,12 @@ export default async function MoviePage({ params }: MoviePageProps) {
   const movie = result.data;
   const year = movie.releaseDate?.slice(0, 4);
 
+  // Read after the film, not alongside it: an anonymous visitor asks for no
+  // rating at all, and a signed-in one should not be blocked on it.
+  const session = await getSession();
+  const signedIn = isSignedIn(session);
+  const myRating = signedIn ? await getMyRating(session.accessToken, movie.id) : null;
+
   return (
     <article className="flex flex-col gap-8">
       {movie.backdropPath ? (
@@ -110,6 +120,12 @@ export default async function MoviePage({ params }: MoviePageProps) {
           </div>
 
           <Facts movie={movie} year={year} />
+
+          <RatingControl
+            movieId={movie.id}
+            rating={myRating?.rating ?? null}
+            signedIn={signedIn}
+          />
 
           {movie.genres.length > 0 ? (
             <ul className="flex flex-wrap gap-2">

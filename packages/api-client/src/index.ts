@@ -20,6 +20,7 @@ export type ImportJobStatusResponse = components["schemas"]["ImportJobStatusResp
 export type ImportReviewResponse = components["schemas"]["ImportReviewResponse"];
 export type ImportReviewItem = components["schemas"]["ImportReviewItem"];
 export type ImportCandidate = components["schemas"]["ImportCandidate"];
+export type MovieRating = components["schemas"]["MovieRating"];
 
 export type { paths };
 
