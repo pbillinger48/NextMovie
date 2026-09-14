@@ -172,6 +172,8 @@ UnrateMovie.Map(app);
 GetMyRatings.Map(app);
 StartLetterboxdImport.Map(app);
 GetImportStatus.Map(app);
+GetImportReview.Map(app);
+ResolveImportItem.Map(app);
 
 app.Run();
 

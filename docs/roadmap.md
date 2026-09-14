@@ -49,7 +49,7 @@
 - [x] Import watched movies
 - [x] Import ratings
 - [x] Background processing
-- [ ] Reconciliation for rows needing review *(~7 per 800, per the spike)*
+- [x] Reconciliation for rows needing review *(~7 per 800, per the spike)*
 - [ ] Build Taste Profile
 
 ---

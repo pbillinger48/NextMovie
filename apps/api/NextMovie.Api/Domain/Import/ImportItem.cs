@@ -73,4 +73,20 @@ public enum ImportItemStatus
 
     /// <summary>Nothing plausible was found.</summary>
     Unresolved = 4,
+
+    /// <summary>
+    /// A person looked at it and said it is not a film we should import.
+    /// </summary>
+    /// <remarks>
+    /// Letterboxd lets people log television, and the spike found 2.5% of one
+    /// real export was TV titles and episodes. Those can never match a film
+    /// search, and the spike is explicit that they need a real status rather than
+    /// a silent drop — a user who imported 796 rows and sees 776 films deserves
+    /// to know where the other twenty went.
+    /// <para>
+    /// Set by a person, never inferred. Deciding something is not a film is
+    /// exactly the judgement the matcher refuses to make on its own.
+    /// </para>
+    /// </remarks>
+    Dismissed = 5,
 }

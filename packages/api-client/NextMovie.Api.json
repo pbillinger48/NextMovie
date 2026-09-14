@@ -706,6 +706,195 @@
           }
         }
       }
+    },
+    "/api/v1/import/{jobId}/review": {
+      "get": {
+        "tags": [
+          "GetImportReview"
+        ],
+        "summary": "List import rows needing review",
+        "description": "Returns the rows of an import that could not be resolved confidently, with the films they might mean.",
+        "operationId": "GetImportReview",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportReviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/import/items/{itemId}/resolve": {
+      "post": {
+        "tags": [
+          "ResolveImportItem"
+        ],
+        "summary": "Choose the film an import row meant",
+        "description": "Applies the row's rating and viewing to the chosen film, as a confident match would have done during the import.",
+        "operationId": "ResolveImportItem",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveImportItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/import/items/{itemId}/dismiss": {
+      "post": {
+        "tags": [
+          "ResolveImportItem"
+        ],
+        "summary": "Dismiss an import row",
+        "description": "Marks a row as deliberately not imported — a television series, or a film the user does not want.",
+        "operationId": "DismissImportItem",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -851,6 +1040,59 @@
         "type": "string",
         "format": "binary"
       },
+      "ImportCandidate": {
+        "required": [
+          "movieId",
+          "tmdbId",
+          "title",
+          "releaseDate",
+          "posterPath",
+          "averageRating"
+        ],
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "description": "NextMovie identifier, to send back when choosing.",
+            "format": "uuid"
+          },
+          "tmdbId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "TMDb identifier.",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title."
+          },
+          "releaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Release date, when known.",
+            "format": "date"
+          },
+          "posterPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Relative TMDb poster path."
+          },
+          "averageRating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "TMDb community rating, which is usually what distinguishes these.",
+            "format": "double"
+          }
+        },
+        "description": "A film an ambiguous row might mean."
+      },
       "ImportJobStatusResponse": {
         "required": [
           "id",
@@ -927,6 +1169,83 @@
           }
         },
         "description": "How an import is going."
+      },
+      "ImportReviewItem": {
+        "required": [
+          "itemId",
+          "name",
+          "year",
+          "rating",
+          "watchedOn",
+          "status",
+          "candidates"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "The row, to resolve or dismiss.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Title exactly as the export gave it."
+          },
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Year the export gave, when it gave one.",
+            "format": "int32"
+          },
+          "rating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The rating waiting to be applied, if the export carried one.",
+            "format": "double"
+          },
+          "watchedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The viewing date from the export, when it had one.",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "description": "`Ambiguous` when several films were plausible, `Unresolved` when\nnone were — which often means the row is television rather than a film."
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportCandidate"
+            },
+            "description": "The films this row might mean. Empty when nothing was found."
+          }
+        },
+        "description": "One row a person has to decide about."
+      },
+      "ImportReviewResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportReviewItem"
+            },
+            "description": "Rows needing review, by title."
+          }
+        },
+        "description": "Import rows awaiting a decision."
       },
       "LoginUserRequest": {
         "required": [
@@ -1353,6 +1672,20 @@
         },
         "description": "Details needed to create an account."
       },
+      "ResolveImportItemRequest": {
+        "required": [
+          "movieId"
+        ],
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "description": "NextMovie identifier of the chosen film.",
+            "format": "uuid"
+          }
+        },
+        "description": "The film an import row meant."
+      },
       "SearchMoviesResponse": {
         "required": [
           "page",
@@ -1515,6 +1848,12 @@
     },
     {
       "name": "GetImportStatus"
+    },
+    {
+      "name": "GetImportReview"
+    },
+    {
+      "name": "ResolveImportItem"
     }
   ]
 }

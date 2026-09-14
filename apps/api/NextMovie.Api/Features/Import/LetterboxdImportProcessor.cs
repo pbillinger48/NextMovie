@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NextMovie.Api.Domain.Import;
 using NextMovie.Api.Infrastructure.Persistence;
 using NextMovie.Api.Infrastructure.Tmdb;
+using NextMovie.Api.Infrastructure.Tmdb.Dtos;
 
 namespace NextMovie.Api.Features.Import;
 
@@ -167,7 +168,7 @@ internal sealed class LetterboxdImportProcessor(
                     }
 
                     consecutiveFailures = 0;
-                    await ApplyAsync(job, item, candidates, cancellationToken);
+                    await ApplyAsync(job, item, candidates.Candidates, candidates.Results, cancellationToken);
                 }
 
                 await db.SaveChangesAsync(cancellationToken);
@@ -215,11 +216,11 @@ internal sealed class LetterboxdImportProcessor(
     /// answering with nothing.
     /// </para>
     /// </remarks>
-    private async Task<List<(ImportItem Item, IReadOnlyList<MatchCandidate>? Candidates)>> ResolveAsync(
+    private async Task<List<(ImportItem Item, ResolvedCandidates? Candidates)>> ResolveAsync(
         List<ImportItem> batch,
         CancellationToken cancellationToken)
     {
-        var results = new (ImportItem Item, IReadOnlyList<MatchCandidate>? Candidates)[batch.Count];
+        var results = new (ImportItem Item, ResolvedCandidates? Candidates)[batch.Count];
 
         await Parallel.ForAsync(
             0,
@@ -237,13 +238,17 @@ internal sealed class LetterboxdImportProcessor(
                 {
                     var search = await tmdb.SearchMoviesAsync(item.Name, page: 1, token);
 
-                    results[index] = (item, [.. search.Results
+                    var usable = search.Results
                         .Where(dto => dto.Id > 0 && !string.IsNullOrWhiteSpace(dto.Title))
-                        .Select(dto => new MatchCandidate(
+                        .ToList();
+
+                    results[index] = (item, new ResolvedCandidates(
+                        [.. usable.Select(dto => new MatchCandidate(
                             dto.Id,
                             dto.Title!,
                             ReleaseYear(dto.ReleaseDate),
-                            dto.VoteCount))]);
+                            dto.VoteCount))],
+                        usable));
                 }
                 catch (TmdbException exception)
                 {
@@ -264,6 +269,7 @@ internal sealed class LetterboxdImportProcessor(
         ImportJob job,
         ImportItem item,
         IReadOnlyList<MatchCandidate> candidates,
+        IReadOnlyList<TmdbMovieDto> searchResults,
         CancellationToken cancellationToken)
     {
         var now = time.GetUtcNow();
@@ -306,6 +312,13 @@ internal sealed class LetterboxdImportProcessor(
                 // Nothing is written to the user's library. A guess here would be
                 // invisible and permanent; a row on a reconciliation screen is
                 // neither.
+                //
+                // The candidates go into the catalogue now, while their TMDb data
+                // is already in hand. Otherwise the review screen would have to
+                // fetch each one later just to show a title — paying for network
+                // calls we have already made.
+                await StoreCandidatesAsync(searchResults, ambiguous.Candidates, cancellationToken);
+
                 item.Status = ImportItemStatus.Ambiguous;
                 item.CandidateTmdbIds = [.. ambiguous.Candidates.Select(candidate => candidate.TmdbId)];
                 job.AmbiguousItems++;
@@ -317,6 +330,34 @@ internal sealed class LetterboxdImportProcessor(
                 job.UnresolvedItems++;
 
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Puts the films a person will have to choose between into the catalogue.
+    /// </summary>
+    /// <remarks>
+    /// Mapped from the search results already fetched, so this adds no TMDb
+    /// traffic. They arrive with only the fields search carries — no runtime, no
+    /// status — which is exactly what the details endpoint fills in later if
+    /// anybody opens one.
+    /// </remarks>
+    private async Task StoreCandidatesAsync(
+        IReadOnlyList<TmdbMovieDto> searchResults,
+        IReadOnlyList<MatchCandidate> candidates,
+        CancellationToken cancellationToken)
+    {
+        var wanted = candidates.Select(candidate => candidate.TmdbId).ToHashSet();
+
+        var mapped = searchResults
+            .Where(dto => wanted.Contains(dto.Id))
+            .Select(TmdbMovieMapper.ToDomain)
+            .OfType<MappedMovie>()
+            .ToList();
+
+        if (mapped.Count > 0)
+        {
+            await catalog.UpsertAsync(mapped, cancellationToken);
         }
     }
 
@@ -354,4 +395,16 @@ internal sealed class LetterboxdImportProcessor(
 
     private static int? ReleaseYear(string? releaseDate) =>
         releaseDate is { Length: >= 4 } && int.TryParse(releaseDate[..4], out var year) ? year : null;
+
+    /// <summary>
+    /// What TMDb offered for one row, in both the forms that are needed.
+    /// </summary>
+    /// <remarks>
+    /// The matcher wants domain candidates; the catalogue wants the wire records
+    /// they were built from. Carrying both avoids re-fetching films we already
+    /// have in hand when a row turns out to need review.
+    /// </remarks>
+    private sealed record ResolvedCandidates(
+        IReadOnlyList<MatchCandidate> Candidates,
+        IReadOnlyList<TmdbMovieDto> Results);
 }
