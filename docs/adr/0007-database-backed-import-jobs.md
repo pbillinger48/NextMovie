@@ -1,6 +1,6 @@
 # ADR-0007: Import jobs live in the database and are worked in-process
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-11
 
 ## Context

@@ -7,12 +7,14 @@ using Microsoft.Extensions.Options;
 using NextMovie.Api.Domain;
 using NextMovie.Api.Features.Auth;
 using NextMovie.Api.Features.Health;
+using NextMovie.Api.Features.Import;
 using NextMovie.Api.Features.Movies;
 using NextMovie.Api.Features.Ratings;
 using NextMovie.Api.Features.Users;
 using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.Auth.Google;
 using NextMovie.Api.Infrastructure.ErrorHandling;
+using NextMovie.Api.Infrastructure.Letterboxd;
 using NextMovie.Api.Infrastructure.OpenApi;
 using NextMovie.Api.Infrastructure.Persistence;
 using NextMovie.Api.Infrastructure.Tmdb;
@@ -46,6 +48,7 @@ builder.Services.AddDbContext<NextMovieDbContext>(options => options
 
 builder.Services.AddScoped<MovieCatalog>();
 builder.Services.AddScoped<UserLibrary>();
+builder.Services.AddScoped<LetterboxdCsvReader>();
 
 // Bound and validated at startup rather than on first use: a missing TMDb token
 // or signing key should stop the process immediately with a clear message, not
@@ -161,6 +164,8 @@ UpdateCurrentUser.Map(app);
 RateMovie.Map(app);
 UnrateMovie.Map(app);
 GetMyRatings.Map(app);
+StartLetterboxdImport.Map(app);
+GetImportStatus.Map(app);
 
 app.Run();
 

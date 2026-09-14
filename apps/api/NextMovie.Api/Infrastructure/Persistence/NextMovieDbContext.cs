@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NextMovie.Api.Domain;
+using NextMovie.Api.Domain.Import;
 using NextMovie.Api.Infrastructure.Persistence.Configurations;
 
 namespace NextMovie.Api.Infrastructure.Persistence;
@@ -24,6 +25,10 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
 
     public DbSet<WatchHistoryEntry> WatchHistory => Set<WatchHistoryEntry>();
 
+    public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
+
+    public DbSet<ImportItem> ImportItems => Set<ImportItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configurations are applied explicitly rather than via
@@ -36,6 +41,8 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
         modelBuilder.ApplyConfiguration(new UserExternalLoginConfiguration());
         modelBuilder.ApplyConfiguration(new RatingConfiguration());
         modelBuilder.ApplyConfiguration(new WatchHistoryEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new ImportJobConfiguration());
+        modelBuilder.ApplyConfiguration(new ImportItemConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

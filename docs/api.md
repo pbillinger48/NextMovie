@@ -567,32 +567,70 @@ PUT
 
 # Letterboxd
 
+Letterboxd has **no public API**, so the only import path is the user's CSV
+export. See [the matching spike](spikes/letterboxd-tmdb-matching.md) for why this
+is asynchronous and how reliably a row resolves to a film.
+
 ## Import
 
-POST
+`POST /api/v1/import/letterboxd`
 
-/api/v1/import/letterboxd
+`multipart/form-data` with a `file` field holding `watched.csv`, `ratings.csv` or
+`diary.csv`. Requires `Authorization: Bearer {token}`.
 
-Starts an asynchronous import.
+The file is parsed immediately and then queued
+([ADR-0007](adr/0007-database-backed-import-jobs.md)) — a malformed CSV fails here
+rather than two minutes later in a job status. **The file itself is not stored.**
 
-Returns
+`202 Accepted`, with a `Location` header pointing at the status endpoint:
 
-Import Job Id
+```json
+{
+  "id": "0199...",
+  "status": "Pending",
+  "totalItems": 796,
+  "matchedItems": 0,
+  "ambiguousItems": 0,
+  "unresolvedItems": 0,
+  "skippedRows": 3,
+  "failureReason": null,
+  "createdAt": "2026-09-11T12:00:00+00:00",
+  "completedAt": null
+}
+```
+
+| Status | When |
+|---|---|
+| `400` | Empty file, not a `.csv`, larger than 5 MB, over 20,000 rows, or containing no films. |
+| `401` | Not signed in. |
+
+`skippedRows` counts rows the export contained that carried no title. They are
+reported rather than dropped silently: a user who exported 800 films and imported
+790 should be told which number is which.
 
 ---
 
 ## Import Status
 
-GET
+`GET /api/v1/import/{jobId}`
 
-/api/v1/import/{jobId}
+Returns the same body as above, for polling. Requires
+`Authorization: Bearer {token}`.
 
-Returns:
+| `status` | Meaning |
+|---|---|
+| `Pending` | Queued, not started |
+| `Running` | Being matched against TMDb |
+| `Completed` | Finished — see the counts |
+| `Failed` | Stopped for a systemic reason; `failureReason` says what |
 
-- Pending
-- Running
-- Completed
-- Failed
+A job belonging to somebody else returns `404`, not `403` — "that exists but is
+not yours" would be an oracle for how many imports other people have run.
+
+The counts split the outcome three ways, which is what the spike found the shape
+of the problem to be: `matchedItems` resolved confidently, `ambiguousItems` need a
+person to choose between candidates, and `unresolvedItems` found nothing
+plausible. Roughly 7 rows per 800 are expected to need review.
 
 ---
 
