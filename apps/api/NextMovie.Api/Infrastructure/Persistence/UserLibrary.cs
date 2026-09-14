@@ -61,6 +61,78 @@ internal sealed class UserLibrary(NextMovieDbContext db, ILogger<UserLibrary> lo
     }
 
     /// <summary>
+    /// Applies an imported rating and viewing, without trampling what the user typed.
+    /// </summary>
+    /// <returns>
+    /// Whether anything was written. False means an existing native rating was
+    /// left alone.
+    /// </returns>
+    /// <remarks>
+    /// The whole reason ADR-0006 put <c>Source</c> on these tables. A re-import
+    /// must be safe to run repeatedly, and "safe" specifically means it never
+    /// overwrites an opinion the user entered by hand — they changed their mind
+    /// since exporting, and the CSV is the stale copy.
+    /// <para>
+    /// Idempotent in the other direction too: a viewing is only added when there
+    /// is not already one for the same film on the same date, so importing the
+    /// same diary twice does not double everybody's rewatches.
+    /// </para>
+    /// </remarks>
+    public async Task<bool> ImportAsync(
+        Guid userId,
+        Guid movieId,
+        decimal? value,
+        DateOnly? watchedOn,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var existing = await db.Ratings
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.MovieId == movieId, cancellationToken);
+
+        var nativeRatingWins = existing is { Source: LibrarySource.Native };
+
+        if (value is not null && !nativeRatingWins)
+        {
+            if (existing is null)
+            {
+                db.Ratings.Add(new Rating
+                {
+                    UserId = userId,
+                    MovieId = movieId,
+                    Value = value.Value,
+                    Source = LibrarySource.LetterboxdImport,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                });
+            }
+            else
+            {
+                existing.Revise(value.Value, LibrarySource.LetterboxdImport, now);
+            }
+        }
+
+        var alreadyLogged = await db.WatchHistory.AnyAsync(
+            entry => entry.UserId == userId && entry.MovieId == movieId && entry.WatchedOn == watchedOn,
+            cancellationToken);
+
+        if (!alreadyLogged)
+        {
+            db.WatchHistory.Add(new WatchHistoryEntry
+            {
+                UserId = userId,
+                MovieId = movieId,
+                WatchedOn = watchedOn,
+                Source = LibrarySource.LetterboxdImport,
+                CreatedAt = now,
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return !nativeRatingWins;
+    }
+
+    /// <summary>
     /// Removes a user's rating of a film, if there is one.
     /// </summary>
     /// <returns>Whether a rating was actually removed.</returns>

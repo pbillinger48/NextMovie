@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using NextMovie.Api.Features.Import;
 using NextMovie.Api.Infrastructure.Auth.Google;
 using NextMovie.Api.Infrastructure.Tmdb;
 
@@ -109,6 +110,18 @@ public sealed class NextMovieApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            // The import worker polls for jobs on its own schedule. Left running,
+            // it would claim the very jobs a test just created and race every
+            // assertion about them. The processor it drives is tested directly
+            // instead, which is deterministic.
+            var worker = services.FirstOrDefault(service =>
+                service.ImplementationType == typeof(ImportWorker));
+
+            if (worker is not null)
+            {
+                services.Remove(worker);
+            }
+
             if (GoogleIdTokens is not null)
             {
                 services.RemoveAll<IGoogleIdTokenVerifier>();
