@@ -29,6 +29,8 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
 
     public DbSet<ImportItem> ImportItems => Set<ImportItem>();
 
+    public DbSet<RecommendationEvent> RecommendationEvents => Set<RecommendationEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configurations are applied explicitly rather than via
@@ -43,6 +45,7 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
         modelBuilder.ApplyConfiguration(new WatchHistoryEntryConfiguration());
         modelBuilder.ApplyConfiguration(new ImportJobConfiguration());
         modelBuilder.ApplyConfiguration(new ImportItemConfiguration());
+        modelBuilder.ApplyConfiguration(new RecommendationEventConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

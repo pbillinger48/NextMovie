@@ -236,6 +236,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recommend films
+         * @description Returns films the signed-in user has not seen, ranked against their viewing and rating history, each with the reasons behind its ranking.
+         */
+        get: operations["GetRecommendations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/import/letterboxd": {
         parameters: {
             query?: never;
@@ -666,6 +686,61 @@ export interface components {
              * @description 0.5 to 5.0, in half-stars.
              */
             rating: null | number;
+        };
+        /** @description Films worth watching next. */
+        RecommendationsResponse: {
+            /**
+             * @description Ranked, best first. Empty when there is not enough history to reason from —
+             *     which is an honest answer rather than a fallback to whatever is popular.
+             */
+            recommendations: components["schemas"]["RecommendedFilm"][];
+        };
+        /** @description One recommended film, and why. */
+        RecommendedFilm: {
+            /**
+             * Format: uuid
+             * @description NextMovie identifier.
+             */
+            movieId: string;
+            /** @description Display title. */
+            title: string;
+            /** @description Relative TMDb poster path. */
+            posterPath: null | string;
+            /**
+             * Format: date
+             * @description Release date, when known.
+             */
+            releaseDate: null | string;
+            /**
+             * Format: int32
+             * @description Runtime in minutes, when known.
+             */
+            runtime: null | number;
+            /**
+             * Format: double
+             * @description TMDb community rating 0–10.
+             */
+            averageRating: null | number;
+            /** @description Genre names, alphabetically. */
+            genres: string[];
+            /**
+             * Format: int32
+             * @description Position in this response, from 1. Deliberately not a match percentage: the
+             *     scores behind a list sit within a few points of each other, and publishing
+             *     them would suggest a precision the model does not have.
+             */
+            rank: number;
+            /**
+             * @description `High`, `Medium` or `Low` — how much history stands behind the
+             *     judgement, including whether this person has watched anything in the film's
+             *     genres.
+             */
+            confidence: string;
+            /**
+             * @description Why it ranked where it did, drawn from the factors that actually moved it.
+             *     Possibly empty; never invented.
+             */
+            reasons: string[];
         };
         /** @description The refresh token to exchange. */
         RefreshSessionRequest: {
@@ -1249,6 +1324,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyRatingsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRecommendations: {
+        parameters: {
+            query?: {
+                count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationsResponse"];
                 };
             };
             /** @description Unauthorized */

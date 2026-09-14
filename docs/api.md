@@ -454,32 +454,64 @@ renders without a request per row.
 
 # Recommendations
 
-## Tonight's Recommendation
+`GET /api/v1/recommendations?count=10`
 
-GET
+Requires `Authorization: Bearer {token}`. Returns films the user has not seen,
+ranked against their viewing and rating history
+([ADR-0008](adr/0008-recommendations-from-tmdb-relatedness.md)).
 
-/api/v1/recommendations/tonight
+```json
+{
+  "recommendations": [
+    {
+      "movieId": "0199...",
+      "title": "A Bronx Tale",
+      "posterPath": "/abc.jpg",
+      "releaseDate": "1993-09-29",
+      "runtime": 121,
+      "averageRating": 7.9,
+      "genres": ["Crime", "Drama"],
+      "rank": 2,
+      "confidence": "High",
+      "reasons": [
+        "You watch a lot of Drama and Crime",
+        "Rated 7.9 by the wider audience"
+      ]
+    }
+  ]
+}
+```
 
-Returns:
+Candidates come from TMDb's relatedness, seeded from the user's best-rated films
+across the range of genres they watch. Scoring, filtering and explanation are
+ours.
 
-- Movie
-- Match Score
-- Confidence
-- Explanation
+**There is no match percentage, deliberately.** The scores behind a list sit
+within a few points of each other, and publishing them would imply a precision the
+model does not have. `rank` and `reasons` are the parts that mean something.
+
+`confidence` reflects how much history stands behind the judgement, including
+whether the user has watched anything in that film's genres — a thousand ratings
+say nothing useful about a documentary if none of them are documentaries.
+
+**An empty list is a real answer**, returned when someone has rated nothing highly
+enough to reason from. Falling back to whatever is popular would be a different
+product wearing this one's clothes.
+
+**No single genre may fill a response.** A library that is 40% drama otherwise
+produces a list of twelve dramas — honest scores, useless list. A cap trades a
+little fidelity for a list worth scanning.
+
+> **This does not yet answer "where can I watch it".** Streaming availability is
+> out of the first version (ADR-0008), so the product's promise is kept except for
+> its last clause. Clients must not imply otherwise.
 
 ---
 
-## Recommendation Feed
+## Recommendation Feedback
 
-GET
-
-/api/v1/recommendations
-
-Supports:
-
-- Page
-- Recipe
-- Genre
+Not built. ADR-0008 defers the feedback *model*; every recommendation served is
+already recorded, so the data to build one is accumulating.
 
 ---
 

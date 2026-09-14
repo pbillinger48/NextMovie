@@ -10,6 +10,7 @@ using NextMovie.Api.Features.Health;
 using NextMovie.Api.Features.Import;
 using NextMovie.Api.Features.Movies;
 using NextMovie.Api.Features.Ratings;
+using NextMovie.Api.Features.Recommendations;
 using NextMovie.Api.Features.Users;
 using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.Auth.Google;
@@ -55,6 +56,7 @@ builder.Services.AddDbContext<NextMovieDbContext>(options => options
 
 builder.Services.AddScoped<MovieCatalog>();
 builder.Services.AddScoped<UserLibrary>();
+builder.Services.AddScoped<RecommendationEngine>();
 builder.Services.AddScoped<LetterboxdCsvReader>();
 builder.Services.AddScoped<LetterboxdImportProcessor>();
 
@@ -181,6 +183,7 @@ RateMovie.Map(app);
 UnrateMovie.Map(app);
 GetMyRatings.Map(app);
 GetMyMovieRating.Map(app);
+GetRecommendations.Map(app);
 StartLetterboxdImport.Map(app);
 GetImportStatus.Map(app);
 GetImportReview.Map(app);
