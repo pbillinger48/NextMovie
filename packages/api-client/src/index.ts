@@ -16,6 +16,10 @@ export type ProblemDetails = components["schemas"]["HttpValidationProblemDetails
 export type AuthenticationResponse = components["schemas"]["AuthenticationResponse"];
 export type AuthenticatedUser = components["schemas"]["AuthenticatedUser"];
 export type UserProfileResponse = components["schemas"]["UserProfileResponse"];
+export type ImportJobStatusResponse = components["schemas"]["ImportJobStatusResponse"];
+export type ImportReviewResponse = components["schemas"]["ImportReviewResponse"];
+export type ImportReviewItem = components["schemas"]["ImportReviewItem"];
+export type ImportCandidate = components["schemas"]["ImportCandidate"];
 
 export type { paths };
 
