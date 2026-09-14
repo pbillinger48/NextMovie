@@ -66,6 +66,11 @@ internal static class ImportResults
         detail: "This session is no longer valid. Sign in again.",
         statusCode: StatusCodes.Status401Unauthorized);
 
+    public static ProblemHttpResult ItemNotFound() => TypedResults.Problem(
+        title: "Import row not found",
+        detail: "No import row awaiting review with that identifier belongs to you.",
+        statusCode: StatusCodes.Status404NotFound);
+
     public static ProblemHttpResult JobNotFound() => TypedResults.Problem(
         title: "Import not found",
         detail: "No import with that identifier belongs to you.",

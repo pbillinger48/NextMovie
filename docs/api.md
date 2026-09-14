@@ -634,6 +634,83 @@ plausible. Roughly 7 rows per 800 are expected to need review.
 
 ---
 
+## Rows needing review
+
+`GET /api/v1/import/{jobId}/review`
+
+Returns the rows the matcher declined to guess at, with the films each might
+mean. Candidates were written into the catalogue while the import ran, so this
+costs no TMDb calls.
+
+```json
+{
+  "items": [
+    {
+      "itemId": "0199...",
+      "name": "How to Make a Killing",
+      "year": 2017,
+      "rating": 4.0,
+      "watchedOn": "2022-01-02",
+      "status": "Ambiguous",
+      "candidates": [
+        {
+          "movieId": "0199...",
+          "tmdbId": 445226,
+          "title": "How to Make a Killing",
+          "releaseDate": "2017-03-10",
+          "posterPath": "/abc.jpg",
+          "averageRating": 6.4
+        }
+      ]
+    }
+  ]
+}
+```
+
+`status` is `Ambiguous` when several films were plausible and nothing separated
+them decisively, or `Unresolved` when nothing plausible was found — which often
+means the row is television. **It is never reported as "not a film"**: that claim
+needs positive evidence, and the absence of a match is not evidence.
+
+---
+
+## Resolve a row
+
+`POST /api/v1/import/items/{itemId}/resolve`
+
+```json
+{ "movieId": "0199..." }
+```
+
+Applies the row's rating and viewing to the chosen film, exactly as a confident
+match would have during the import, and records the match as `Manual`. Returns
+the job's updated counts.
+
+**Any film in the catalogue is accepted**, not only the candidates offered —
+somebody who searched and found the right film should not be told their answer is
+not on the list.
+
+| Status | When |
+|---|---|
+| `400` | No film with that identifier is in the catalogue. |
+| `401` | Not signed in. |
+| `404` | No row awaiting review with that identifier belongs to you. |
+
+---
+
+## Dismiss a row
+
+`POST /api/v1/import/items/{itemId}/dismiss`
+
+Marks a row as deliberately not imported — a television series, or a film the
+user does not want. Returns the job's updated counts.
+
+The row is **dismissed, not deleted**: it stays as a record that the export
+contained it and a person decided against it, which is the difference between
+"we skipped 20 rows" and data quietly going missing.
+
+---
+
 # Taste Profile
 
 ## Get Taste Profile

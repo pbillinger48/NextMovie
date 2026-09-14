@@ -272,6 +272,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/import/{jobId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List import rows needing review
+         * @description Returns the rows of an import that could not be resolved confidently, with the films they might mean.
+         */
+        get: operations["GetImportReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/import/items/{itemId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose the film an import row meant
+         * @description Applies the row's rating and viewing to the chosen film, as a confident match would have done during the import.
+         */
+        post: operations["ResolveImportItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/import/items/{itemId}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss an import row
+         * @description Marks a row as deliberately not imported — a television series, or a film the user does not want.
+         */
+        post: operations["DismissImportItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -334,6 +394,33 @@ export interface components {
         };
         /** Format: binary */
         IFormFile: string;
+        /** @description A film an ambiguous row might mean. */
+        ImportCandidate: {
+            /**
+             * Format: uuid
+             * @description NextMovie identifier, to send back when choosing.
+             */
+            movieId: string;
+            /**
+             * Format: int32
+             * @description TMDb identifier.
+             */
+            tmdbId: number;
+            /** @description Display title. */
+            title: string;
+            /**
+             * Format: date
+             * @description Release date, when known.
+             */
+            releaseDate: null | string;
+            /** @description Relative TMDb poster path. */
+            posterPath: null | string;
+            /**
+             * Format: double
+             * @description TMDb community rating, which is usually what distinguishes these.
+             */
+            averageRating: null | number;
+        };
         /** @description How an import is going. */
         ImportJobStatusResponse: {
             /**
@@ -380,6 +467,43 @@ export interface components {
              * @description When the import finished, if it has.
              */
             completedAt: null | string;
+        };
+        /** @description One row a person has to decide about. */
+        ImportReviewItem: {
+            /**
+             * Format: uuid
+             * @description The row, to resolve or dismiss.
+             */
+            itemId: string;
+            /** @description Title exactly as the export gave it. */
+            name: string;
+            /**
+             * Format: int32
+             * @description Year the export gave, when it gave one.
+             */
+            year: null | number;
+            /**
+             * Format: double
+             * @description The rating waiting to be applied, if the export carried one.
+             */
+            rating: null | number;
+            /**
+             * Format: date
+             * @description The viewing date from the export, when it had one.
+             */
+            watchedOn: null | string;
+            /**
+             * @description `Ambiguous` when several films were plausible, `Unresolved` when
+             *     none were — which often means the row is television rather than a film.
+             */
+            status: string;
+            /** @description The films this row might mean. Empty when nothing was found. */
+            candidates: components["schemas"]["ImportCandidate"][];
+        };
+        /** @description Import rows awaiting a decision. */
+        ImportReviewResponse: {
+            /** @description Rows needing review, by title. */
+            items: components["schemas"]["ImportReviewItem"][];
         };
         /** @description Credentials presented at sign-in. */
         LoginUserRequest: {
@@ -552,6 +676,14 @@ export interface components {
             displayName: null | string;
             /** @description Chosen password. See PasswordPolicy for the rules. */
             password: null | string;
+        };
+        /** @description The film an import row meant. */
+        ResolveImportItemRequest: {
+            /**
+             * Format: uuid
+             * @description NextMovie identifier of the chosen film.
+             */
+            movieId: string;
         };
         /** @description A page of search results. */
         SearchMoviesResponse: {
@@ -1148,6 +1280,148 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportJobStatusResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetImportReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReviewResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ResolveImportItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveImportItemRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobStatusResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DismissImportItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobStatusResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
                 };
             };
             /** @description Unauthorized */
