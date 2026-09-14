@@ -127,6 +127,7 @@ public static class StartLetterboxdImport
                 FilmUri = entry.FilmUri,
                 Rating = entry.Rating,
                 WatchedOn = entry.WatchedOn,
+                IsLoggedViewing = entry.IsLoggedViewing,
             });
         }
 

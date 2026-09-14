@@ -21,6 +21,13 @@ using NextMovie.Api.Infrastructure.Tmdb;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// The build-time OpenAPI generator starts this host in-process to read endpoint
+// metadata (see OpenApiGenerateDocumentsOnBuild in the csproj). It has no
+// secrets, no database and nothing to do — so anything that runs on its own
+// schedule must stay switched off there, or every build logs failures from a
+// worker polling a database that was never meant to exist.
+var isSchemaGeneration = Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
+
 // Structured logging without an extra dependency. Serilog stays deferred until
 // there is a real sink (Application Insights, Seq) that justifies it.
 // Human-readable locally; machine-parseable JSON everywhere else.
@@ -54,7 +61,10 @@ builder.Services.AddScoped<LetterboxdImportProcessor>();
 // The queue is a table and this is what drains it (ADR-0007). Registered last of
 // the import pieces so the dependency direction is obvious: the worker needs the
 // processor, and the processor needs everything above it.
-builder.Services.AddHostedService<ImportWorker>();
+if (!isSchemaGeneration)
+{
+    builder.Services.AddHostedService<ImportWorker>();
+}
 
 // Bound and validated at startup rather than on first use: a missing TMDb token
 // or signing key should stop the process immediately with a clear message, not
@@ -83,7 +93,7 @@ var googleOptions = builder.Services
 // validation would fail `dotnet build` on a correctly configured machine and
 // make the schema unbuildable in CI. Only that context is exempt; every run
 // that actually serves traffic still validates.
-if (Assembly.GetEntryAssembly()?.GetName().Name != "GetDocument.Insider")
+if (!isSchemaGeneration)
 {
     tmdbOptions.ValidateOnStart();
     jwtOptions.ValidateOnStart();

@@ -173,6 +173,36 @@ public sealed class LetterboxdCsvReaderTests
     }
 
     [Fact]
+    public void Recognises_a_diary_export_by_its_watched_date_column()
+    {
+        var result = Read(
+            """
+            Date,Name,Year,Letterboxd URI,Rating,Watched Date
+            2024-05-01,Inception,2010,https://boxd.it/abc,4.5,2024-04-28
+            """);
+
+        // Only diary.csv has this column, and only diary rows record individual
+        // viewings — which is what decides whether importing one may add a second
+        // viewing of the same film.
+        Assert.True(Assert.Single(result.Entries).IsLoggedViewing);
+    }
+
+    [Theory]
+    [InlineData("Date,Name,Year,Letterboxd URI")]
+    [InlineData("Date,Name,Year,Letterboxd URI,Rating")]
+    public void Treats_list_exports_as_membership_rather_than_viewings(string header)
+    {
+        var result = Read($"""
+            {header}
+            2022-01-02,Inception,2010,https://boxd.it/abc,4
+            """);
+
+        // watched.csv and ratings.csv list films. Their Date column records when
+        // the row was created, not when the film was seen.
+        Assert.False(Assert.Single(result.Entries).IsLoggedViewing);
+    }
+
+    [Fact]
     public void Tolerates_an_export_with_no_rating_column()
     {
         var result = Read(

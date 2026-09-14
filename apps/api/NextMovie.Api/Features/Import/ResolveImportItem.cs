@@ -82,23 +82,36 @@ public static class ResolveImportItem
 
         var now = time.GetUtcNow();
 
-        await library.ImportAsync(userId, movie.Id, item.Rating, item.WatchedOn, now, cancellationToken);
+        // Every pending row for the same film, across every import this user has
+        // run — not just the one they clicked. Importing watched.csv and then
+        // ratings.csv queues the same unmatched film twice, and being asked the
+        // same question again because of how the export was split is the tool's
+        // problem, not the user's.
+        foreach (var sibling in await FindSameFilmAsync(db, item, userId, cancellationToken))
+        {
+            // Each row carries its own rating and date: the watched.csv row has
+            // no rating and the ratings.csv row does, and both matter.
+            await library.ImportAsync(
+                userId,
+                movie.Id,
+                sibling.Rating,
+                sibling.WatchedOn,
+                sibling.IsLoggedViewing,
+                now,
+                cancellationToken);
 
-        var job = item.ImportJob;
+            DecrementReviewCount(sibling.ImportJob, sibling.Status);
+            sibling.ImportJob.MatchedItems++;
 
-        // The counts move together: a row leaves the review pile exactly as it
-        // joins the matched one, so the totals still add up afterwards.
-        DecrementReviewCount(job, item.Status);
-        job.MatchedItems++;
-
-        item.Status = ImportItemStatus.Matched;
-        item.MatchedMovieId = movie.Id;
-        item.MatchMethod = MatchMethod.Manual;
-        item.ResolvedAt = now;
+            sibling.Status = ImportItemStatus.Matched;
+            sibling.MatchedMovieId = movie.Id;
+            sibling.MatchMethod = MatchMethod.Manual;
+            sibling.ResolvedAt = now;
+        }
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Ok(ImportJobStatusResponse.From(job));
+        return TypedResults.Ok(ImportJobStatusResponse.From(item.ImportJob));
     }
 
     private static async Task<Results<Ok<ImportJobStatusResponse>, ValidationProblem, ProblemHttpResult>> DismissAsync(
@@ -120,13 +133,19 @@ public static class ResolveImportItem
             return ImportResults.ItemNotFound();
         }
 
-        DecrementReviewCount(item.ImportJob, item.Status);
+        var now = time.GetUtcNow();
 
-        // Dismissed, not deleted. The row stays as a record that the export
-        // contained it and a person decided against it — which is the difference
-        // between "we skipped 20 rows" and data quietly going missing.
-        item.Status = ImportItemStatus.Dismissed;
-        item.ResolvedAt = time.GetUtcNow();
+        foreach (var sibling in await FindSameFilmAsync(db, item, userId, cancellationToken))
+        {
+            DecrementReviewCount(sibling.ImportJob, sibling.Status);
+
+            // Dismissed, not deleted. The row stays as a record that the export
+            // contained it and a person decided against it — which is the
+            // difference between "we skipped 20 rows" and data quietly going
+            // missing.
+            sibling.Status = ImportItemStatus.Dismissed;
+            sibling.ResolvedAt = now;
+        }
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -150,6 +169,35 @@ public static class ResolveImportItem
                     && (item.Status == ImportItemStatus.Ambiguous
                         || item.Status == ImportItemStatus.Unresolved),
                 cancellationToken);
+
+    /// <summary>
+    /// Every row still awaiting review that means the same film as this one,
+    /// including the row itself.
+    /// </summary>
+    /// <remarks>
+    /// Matched on Letterboxd's film URI where the export gave one — the spike
+    /// found it stable across exports, which is exactly what makes it the right
+    /// key for this. Where it is absent, title and year are the best available
+    /// substitute.
+    /// </remarks>
+    private static async Task<List<ImportItem>> FindSameFilmAsync(
+        NextMovieDbContext db,
+        ImportItem item,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var pending = db.ImportItems
+            .Include(candidate => candidate.ImportJob)
+            .Where(candidate => candidate.ImportJob.UserId == userId
+                && (candidate.Status == ImportItemStatus.Ambiguous
+                    || candidate.Status == ImportItemStatus.Unresolved));
+
+        return item.FilmUri is { Length: > 0 } filmUri
+            ? await pending.Where(candidate => candidate.FilmUri == filmUri).ToListAsync(cancellationToken)
+            : await pending
+                .Where(candidate => candidate.Name == item.Name && candidate.Year == item.Year)
+                .ToListAsync(cancellationToken);
+    }
 
     private static void DecrementReviewCount(ImportJob job, ImportItemStatus status)
     {
