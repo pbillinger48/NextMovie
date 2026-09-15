@@ -21,6 +21,8 @@ export type ImportReviewResponse = components["schemas"]["ImportReviewResponse"]
 export type ImportReviewItem = components["schemas"]["ImportReviewItem"];
 export type ImportCandidate = components["schemas"]["ImportCandidate"];
 export type MovieRating = components["schemas"]["MovieRating"];
+export type RecommendationsResponse = components["schemas"]["RecommendationsResponse"];
+export type RecommendedFilm = components["schemas"]["RecommendedFilm"];
 
 export type { paths };
 

@@ -56,11 +56,12 @@
 
 ## Phase 5 - Recommendation Engine
 
-- [ ] Taste profile generation
-- [ ] Weighted scoring
-- [ ] Confidence score
-- [ ] Recommendation explanations
-- [ ] Recommendation recipes
+- [x] Taste profile generation
+- [x] Weighted scoring
+- [x] Confidence score
+- [x] Recommendation explanations
+- [ ] Recommendation recipes *(deferred — one ranking first, variations later)*
+- [ ] Streaming availability *(ADR-0008 keeps it out of v1; the promise is not yet whole)*
 
 ---
 
