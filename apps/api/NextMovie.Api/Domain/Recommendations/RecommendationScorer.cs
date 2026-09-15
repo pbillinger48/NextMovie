@@ -63,12 +63,20 @@ public static class RecommendationScorer
     private const int ModestlyConfidentRatings = 25;
 
     /// <summary>Scores one candidate.</summary>
+    /// <param name="candidate">The film being considered.</param>
+    /// <param name="profile">What this person watches.</param>
+    /// <param name="genreNames">For phrasing the reasons.</param>
+    /// <param name="genreInformativeness">
+    /// How much each genre distinguishes one candidate from another in the pool
+    /// being ranked. See <see cref="Informativeness"/>.
+    /// </param>
     public static ScoredRecommendation Score(
         RecommendationCandidate candidate,
         TasteProfile profile,
-        IReadOnlyDictionary<int, string> genreNames)
+        IReadOnlyDictionary<int, string> genreNames,
+        IReadOnlyDictionary<int, double>? genreInformativeness = null)
     {
-        var taste = GenreScore(candidate, profile);
+        var taste = GenreScore(candidate, profile, genreInformativeness);
         var quality = CommunityScore(candidate);
         var runtime = RangeScore(candidate.Runtime, profile.PreferredRuntimes, tolerance: 30);
         var era = RangeScore(candidate.ReleaseYear, profile.PreferredEra, tolerance: 15);
@@ -98,7 +106,10 @@ public static class RecommendationScorer
     /// worse bet than one that is wholly science fiction, and taking the maximum
     /// would rate them the same.
     /// </remarks>
-    private static double GenreScore(RecommendationCandidate candidate, TasteProfile profile)
+    private static double GenreScore(
+        RecommendationCandidate candidate,
+        TasteProfile profile,
+        IReadOnlyDictionary<int, double>? informativeness)
     {
         if (candidate.GenreIds.Count == 0 || profile.GenreAffinity.Count == 0)
         {
@@ -107,10 +118,65 @@ public static class RecommendationScorer
             return TasteProfile.NoOpinion;
         }
 
-        // Averaged across the film's genres rather than taking the best: a film
-        // that is half something the user avoids is a worse bet than one wholly
-        // in a genre they seek out, and the maximum would rate them the same.
-        return Math.Clamp(candidate.GenreIds.Select(profile.AffinityFor).Average(), 0, 1);
+        // A weighted average across the film's genres rather than the best of
+        // them: a film that is half something the user avoids is a worse bet than
+        // one wholly in a genre they seek out, and a maximum would rate the two
+        // the same.
+        //
+        // The weights are how much each genre distinguishes this film from the
+        // others being ranked. When every candidate is a drama, being a drama
+        // says nothing, and the genres that differ decide instead.
+        var weighted = 0.0;
+        var weights = 0.0;
+
+        foreach (var genreId in candidate.GenreIds)
+        {
+            var weight = informativeness?.GetValueOrDefault(genreId, 1.0) ?? 1.0;
+
+            weighted += profile.AffinityFor(genreId) * weight;
+            weights += weight;
+        }
+
+        return weights <= 0
+            ? TasteProfile.NoOpinion
+            : Math.Clamp(weighted / weights, 0, 1);
+    }
+
+    /// <summary>
+    /// How much each genre distinguishes one candidate from another.
+    /// </summary>
+    /// <remarks>
+    /// A genre shared by nearly every candidate carries almost no information
+    /// about which to prefer — the same reason a search engine discounts common
+    /// words. Drama is 40% of all films; "you watch a lot of drama" is close to
+    /// "you watch films".
+    /// <para>
+    /// Measured across the pool being ranked rather than the whole catalogue,
+    /// which makes it self-correcting: when every candidate happens to be a
+    /// drama, drama stops deciding and the genres that actually differ take over.
+    /// </para>
+    /// </remarks>
+    public static Dictionary<int, double> Informativeness(
+        IReadOnlyList<RecommendationCandidate> pool)
+    {
+        if (pool.Count == 0)
+        {
+            return [];
+        }
+
+        var counts = new Dictionary<int, int>();
+
+        foreach (var genreId in pool.SelectMany(candidate => candidate.GenreIds.Distinct()))
+        {
+            counts[genreId] = counts.GetValueOrDefault(genreId) + 1;
+        }
+
+        return counts.ToDictionary(
+            entry => entry.Key,
+
+            // Inverse document frequency, floored so a ubiquitous genre is
+            // discounted rather than silenced: it still carries a little signal.
+            entry => Math.Max(0.1, Math.Log((double)pool.Count / entry.Value) + 0.1));
     }
 
     private static double CommunityScore(RecommendationCandidate candidate) =>

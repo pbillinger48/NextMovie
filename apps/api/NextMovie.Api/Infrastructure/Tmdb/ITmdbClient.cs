@@ -21,4 +21,17 @@ internal interface ITmdbClient
     /// outage.
     /// </exception>
     Task<TmdbMovieDetailsResponse> GetMovieAsync(int tmdbId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Films TMDb considers related to this one.
+    /// </summary>
+    /// <remarks>
+    /// The candidate source for recommendations (ADR-0008). TMDb computes this
+    /// from a user base orders of magnitude larger than ours, which is not
+    /// something we can outcompute from nineteen genre labels.
+    /// </remarks>
+    /// <param name="tmdbId">The film to find relatives of.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="TmdbException">TMDb was unreachable or returned a failure.</exception>
+    Task<TmdbSearchResponse> GetRelatedMoviesAsync(int tmdbId, CancellationToken cancellationToken);
 }

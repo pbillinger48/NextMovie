@@ -645,6 +645,49 @@
         }
       }
     },
+    "/api/v1/recommendations": {
+      "get": {
+        "tags": [
+          "GetRecommendations"
+        ],
+        "summary": "Recommend films",
+        "description": "Returns films the signed-in user has not seen, ranked against their viewing and rating history, each with the reasons behind its ranking.",
+        "operationId": "GetRecommendations",
+        "parameters": [
+          {
+            "name": "count",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/import/letterboxd": {
       "post": {
         "tags": [
@@ -1675,6 +1718,106 @@
         },
         "description": "A rating to record."
       },
+      "RecommendationsResponse": {
+        "required": [
+          "recommendations"
+        ],
+        "type": "object",
+        "properties": {
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendedFilm"
+            },
+            "description": "Ranked, best first. Empty when there is not enough history to reason from —\nwhich is an honest answer rather than a fallback to whatever is popular."
+          }
+        },
+        "description": "Films worth watching next."
+      },
+      "RecommendedFilm": {
+        "required": [
+          "movieId",
+          "title",
+          "posterPath",
+          "releaseDate",
+          "runtime",
+          "averageRating",
+          "genres",
+          "rank",
+          "confidence",
+          "reasons"
+        ],
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "description": "NextMovie identifier.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title."
+          },
+          "posterPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Relative TMDb poster path."
+          },
+          "releaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Release date, when known.",
+            "format": "date"
+          },
+          "runtime": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Runtime in minutes, when known.",
+            "format": "int32"
+          },
+          "averageRating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "TMDb community rating 0–10.",
+            "format": "double"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Genre names, alphabetically."
+          },
+          "rank": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Position in this response, from 1. Deliberately not a match percentage: the\nscores behind a list sit within a few points of each other, and publishing\nthem would suggest a precision the model does not have.",
+            "format": "int32"
+          },
+          "confidence": {
+            "type": "string",
+            "description": "`High`, `Medium` or `Low` — how much history stands behind the\njudgement, including whether this person has watched anything in the film's\ngenres."
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why it ranked where it did, drawn from the factors that actually moved it.\nPossibly empty; never invented."
+          }
+        },
+        "description": "One recommended film, and why."
+      },
       "RefreshSessionRequest": {
         "required": [
           "refreshToken"
@@ -1896,6 +2039,9 @@
     },
     {
       "name": "GetMyRatings"
+    },
+    {
+      "name": "GetRecommendations"
     },
     {
       "name": "StartLetterboxdImport"
