@@ -32,6 +32,10 @@ export async function SessionNav() {
 
   return (
     <nav className="flex items-center gap-4 text-sm">
+      <Link href="/recommendations" className="hover:underline underline-offset-4">
+        What to watch
+      </Link>
+
       <Link
         href="/profile"
         className="text-neutral-600 hover:underline underline-offset-4 dark:text-neutral-400"
