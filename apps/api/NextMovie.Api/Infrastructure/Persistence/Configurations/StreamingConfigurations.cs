@@ -112,3 +112,44 @@ public sealed class UserStreamingProviderConfiguration : IEntityTypeConfiguratio
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary>Maps <see cref="RegionalProvider"/> to the <c>regional_providers</c> table.</summary>
+public sealed class RegionalProviderConfiguration : IEntityTypeConfiguration<RegionalProvider>
+{
+    public void Configure(EntityTypeBuilder<RegionalProvider> builder)
+    {
+        // The pair is the identity: a service is either offered in a country or
+        // it is not, and there is nothing else to say about the combination.
+        builder.HasKey(offered => new { offered.Region, offered.StreamingProviderId });
+
+        builder.Property(offered => offered.Region)
+            .HasMaxLength(2)
+            .IsFixedLength()
+            .IsRequired();
+
+        // Every read is "the catalogue for one country, in order", which is
+        // exactly this index.
+        builder.HasIndex(offered => new { offered.Region, offered.DisplayPriority });
+
+        builder
+            .HasOne(offered => offered.StreamingProvider)
+            .WithMany()
+            .HasForeignKey(offered => offered.StreamingProviderId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+/// <summary>Maps <see cref="RegionCatalog"/> to the <c>region_catalogs</c> table.</summary>
+public sealed class RegionCatalogConfiguration : IEntityTypeConfiguration<RegionCatalog>
+{
+    public void Configure(EntityTypeBuilder<RegionCatalog> builder)
+    {
+        builder.HasKey(catalog => catalog.Region);
+
+        builder.Property(catalog => catalog.Region)
+            .HasMaxLength(2)
+            .IsFixedLength()
+            .ValueGeneratedNever()
+            .IsRequired();
+    }
+}

@@ -620,6 +620,9 @@ public sealed class LetterboxdImportProcessorTests(PostgresFixture postgres) : I
 
         public TmdbException? Failure { get; set; }
 
+        public Task<TmdbProviderListResponse> GetProvidersAsync(string region, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("These tests do not ask for the service catalogue.");
+
         public Task<TmdbWatchProvidersResponse> GetWatchProvidersAsync(int tmdbId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("These tests do not ask about availability.");
 

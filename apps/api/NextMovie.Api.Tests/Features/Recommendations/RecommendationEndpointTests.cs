@@ -464,6 +464,9 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
 
     private sealed class StubTmdb : ITmdbClient
     {
+        public Task<TmdbProviderListResponse> GetProvidersAsync(string region, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("These tests do not ask for the service catalogue.");
+
         public Dictionary<int, TmdbMovieDto[]> Related { get; } = [];
 
         public int RelatedCalls { get; private set; }

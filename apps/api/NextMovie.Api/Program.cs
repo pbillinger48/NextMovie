@@ -11,6 +11,7 @@ using NextMovie.Api.Features.Import;
 using NextMovie.Api.Features.Movies;
 using NextMovie.Api.Features.Ratings;
 using NextMovie.Api.Features.Recommendations;
+using NextMovie.Api.Features.Streaming;
 using NextMovie.Api.Features.Users;
 using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.Auth.Google;
@@ -64,6 +65,8 @@ builder.Services.AddScoped<RecommendationEngine>();
 // leaves a service and does not link to the film on it (ADR-0010).
 builder.Services.AddScoped<IAvailabilityProvider, TmdbAvailabilityProvider>();
 builder.Services.AddScoped<AvailabilityCatalog>();
+builder.Services.AddScoped<IServiceDirectory, TmdbServiceDirectory>();
+builder.Services.AddScoped<ServiceCatalog>();
 builder.Services.AddScoped<LetterboxdCsvReader>();
 builder.Services.AddScoped<LetterboxdImportProcessor>();
 
@@ -195,6 +198,8 @@ StartLetterboxdImport.Map(app);
 GetImportStatus.Map(app);
 GetImportReview.Map(app);
 ResolveImportItem.Map(app);
+GetStreamingSettings.Map(app);
+UpdateStreamingSettings.Map(app);
 
 app.Run();
 

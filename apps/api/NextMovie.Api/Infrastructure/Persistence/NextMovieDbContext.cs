@@ -38,6 +38,10 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
 
     public DbSet<UserStreamingProvider> UserStreamingProviders => Set<UserStreamingProvider>();
 
+    public DbSet<RegionalProvider> RegionalProviders => Set<RegionalProvider>();
+
+    public DbSet<RegionCatalog> RegionCatalogs => Set<RegionCatalog>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Configurations are applied explicitly rather than via
@@ -57,6 +61,8 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
         modelBuilder.ApplyConfiguration(new MovieAvailabilityConfiguration());
         modelBuilder.ApplyConfiguration(new AvailabilityOfferConfiguration());
         modelBuilder.ApplyConfiguration(new UserStreamingProviderConfiguration());
+        modelBuilder.ApplyConfiguration(new RegionalProviderConfiguration());
+        modelBuilder.ApplyConfiguration(new RegionCatalogConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

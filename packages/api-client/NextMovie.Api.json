@@ -989,6 +989,88 @@
           }
         }
       }
+    },
+    "/api/v1/users/me/streaming": {
+      "get": {
+        "tags": [
+          "GetStreamingSettings"
+        ],
+        "summary": "Get the signed-in user's streaming settings",
+        "description": "Returns the user's region, the countries they may choose from, and the services on offer there with their subscriptions marked.",
+        "operationId": "GetStreamingSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamingSettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "UpdateStreamingSettings"
+        ],
+        "summary": "Update the signed-in user's streaming settings",
+        "description": "Replaces the region and the set of subscribed services. Services absent from the request are treated as cancelled.",
+        "operationId": "UpdateStreamingSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStreamingSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamingSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1059,6 +1141,24 @@
           }
         },
         "description": "A newly established session."
+      },
+      "CountryOption": {
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 code."
+          },
+          "name": {
+            "type": "string",
+            "description": "English name, for display."
+          }
+        },
+        "description": "One country on offer."
       },
       "HealthResponse": {
         "required": [
@@ -1943,6 +2043,73 @@
         },
         "description": "The Google ID token to sign in with."
       },
+      "StreamingServiceOption": {
+        "required": [
+          "id",
+          "name",
+          "logoPath",
+          "subscribed",
+          "offeredHere"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": "integer",
+            "description": "Provider identifier, the same one offers on films carry.",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name to show."
+          },
+          "logoPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Relative logo path, when the source has one."
+          },
+          "subscribed": {
+            "type": "boolean",
+            "description": "Whether this person has said they subscribe."
+          },
+          "offeredHere": {
+            "type": "boolean",
+            "description": "Whether the service operates in their country. False only for something they\nticked before moving — see the remarks on StreamingSettings."
+          }
+        },
+        "description": "One service, and whether this person says they have it."
+      },
+      "StreamingSettingsResponse": {
+        "required": [
+          "region",
+          "countries",
+          "services"
+        ],
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string",
+            "description": "The country their availability is answered for, as ISO 3166-1 alpha-2."
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CountryOption"
+            },
+            "description": "Countries they may choose between, ordered by name."
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StreamingServiceOption"
+            },
+            "description": "Services they may tick, most prominent in their country first."
+          }
+        },
+        "description": "Where a person watches, and what they pay for."
+      },
       "UpdateCurrentUserRequest": {
         "required": [
           "displayName",
@@ -1966,6 +2133,35 @@
           }
         },
         "description": "The new state of the editable profile."
+      },
+      "UpdateStreamingSettingsRequest": {
+        "required": [
+          "region",
+          "providerIds"
+        ],
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ISO 3166-1 alpha-2 country code. Required."
+          },
+          "providerIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Every service they subscribe to. Omit or send an empty list to say they have\nnone — this replaces the set rather than adding to it."
+          }
+        },
+        "description": "The new state of someone's streaming settings."
       },
       "UserProfileResponse": {
         "required": [
@@ -2114,6 +2310,12 @@
     },
     {
       "name": "ResolveImportItem"
+    },
+    {
+      "name": "GetStreamingSettings"
+    },
+    {
+      "name": "UpdateStreamingSettings"
     }
   ]
 }
