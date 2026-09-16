@@ -236,6 +236,9 @@ public sealed class GetMovieDetailsTests(PostgresFixture postgres) : IAsyncLifet
             ],
         };
 
+        public Task<TmdbWatchProvidersResponse> GetWatchProvidersAsync(int tmdbId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("These tests do not ask about availability.");
+
         public Task<TmdbSearchResponse> GetRelatedMoviesAsync(int tmdbId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("These tests do not ask for related films.");
 

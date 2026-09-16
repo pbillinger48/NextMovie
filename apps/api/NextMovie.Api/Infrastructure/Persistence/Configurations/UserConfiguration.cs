@@ -26,6 +26,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.ProfileImageUrl).HasMaxLength(2048);
 
+        // ISO 3166-1 alpha-2, and never anything else.
+        builder.Property(u => u.Region).HasMaxLength(2).IsFixedLength().IsRequired();
+
         // Uniqueness lives on the normalised column, so Parker@x.com cannot
         // register alongside parker@x.com.
         //

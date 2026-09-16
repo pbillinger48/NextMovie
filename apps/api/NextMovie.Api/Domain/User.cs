@@ -1,4 +1,5 @@
 using NextMovie.Api.Domain.Authentication;
+using NextMovie.Api.Domain.Streaming;
 
 namespace NextMovie.Api.Domain;
 
@@ -61,6 +62,20 @@ public class User
     public string? PasswordHash { get; set; }
 
     public string? ProfileImageUrl { get; set; }
+
+    /// <summary>
+    /// Where this person watches things, as an ISO 3166-1 alpha-2 code.
+    /// </summary>
+    /// <remarks>
+    /// Streaming availability is regional and the answer differs sharply by
+    /// country, so this decides what they are told is watchable. Stored on the
+    /// account rather than inferred per request: a holiday or a VPN should not
+    /// silently change what a person is told they can watch (ADR-0010).
+    /// </remarks>
+    public string Region { get; set; } = DefaultRegion;
+
+    /// <summary>Services this person subscribes to.</summary>
+    public ICollection<UserStreamingProvider> StreamingProviders { get; init; } = [];
 
     /// <summary>
     /// Consecutive failed sign-in attempts, reset on success.
@@ -142,4 +157,14 @@ public class User
     /// </summary>
     public static string NormalizeEmail(string email) =>
         email.Trim().ToUpperInvariant();
+
+    /// <summary>
+    /// The region assumed until somebody says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// A default has to be something, and a wrong one is visible and correctable
+    /// in settings — which is better than refusing to show availability at all
+    /// until a person has been made to answer a question they did not ask.
+    /// </remarks>
+    public const string DefaultRegion = "US";
 }

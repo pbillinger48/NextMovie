@@ -18,6 +18,7 @@ using NextMovie.Api.Infrastructure.ErrorHandling;
 using NextMovie.Api.Infrastructure.Letterboxd;
 using NextMovie.Api.Infrastructure.OpenApi;
 using NextMovie.Api.Infrastructure.Persistence;
+using NextMovie.Api.Domain.Streaming;
 using NextMovie.Api.Infrastructure.Tmdb;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -57,6 +58,12 @@ builder.Services.AddDbContext<NextMovieDbContext>(options => options
 builder.Services.AddScoped<MovieCatalog>();
 builder.Services.AddScoped<UserLibrary>();
 builder.Services.AddScoped<RecommendationEngine>();
+
+// Availability sits behind an interface because it is the piece most likely to be
+// replaced: TMDb's data is free and adequate, but it cannot say when a film
+// leaves a service and does not link to the film on it (ADR-0010).
+builder.Services.AddScoped<IAvailabilityProvider, TmdbAvailabilityProvider>();
+builder.Services.AddScoped<AvailabilityCatalog>();
 builder.Services.AddScoped<LetterboxdCsvReader>();
 builder.Services.AddScoped<LetterboxdImportProcessor>();
 

@@ -400,6 +400,9 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
             });
         }
 
+        public Task<TmdbWatchProvidersResponse> GetWatchProvidersAsync(int tmdbId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("These tests do not ask about availability.");
+
         public Task<TmdbSearchResponse> SearchMoviesAsync(string title, int page, CancellationToken cancellationToken) =>
             throw new NotSupportedException("These tests do not search.");
 
