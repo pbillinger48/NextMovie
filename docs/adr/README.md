@@ -29,6 +29,7 @@ Where an ADR and `docs/` disagree, **the ADR wins** — the product docs predate
 | [0009](0009-recommend-only-films-worth-an-evening.md) | Recommend only films worth an evening | Accepted |
 | [0010](0010-streaming-availability.md) | Streaming availability, per region, cached daily | Accepted |
 | [0011](0011-recommendation-responses.md) | Recommendation responses, and the watchlist as one of them | Accepted |
+| [0012](0012-offline-recommendation-evaluation.md) | Evaluate recommendations offline, against a held-out library | Accepted |
 
 ## Template
 
