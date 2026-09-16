@@ -14,9 +14,9 @@ namespace NextMovie.Api.Features.Recommendations;
 /// Candidates come from TMDb's relatedness, seeded from the films this person
 /// rated most highly; the ranking, filtering and explanation are ours (ADR-0008).
 /// <para>
-/// Note what this deliberately does <b>not</b> answer: where to watch anything.
-/// Streaming availability is out of the first version, and the response says so
-/// rather than leaving clients to imply otherwise.
+/// Each film carries where the viewer can watch it, in their region and against
+/// the services they subscribe to (ADR-0010). Films they have already answered
+/// about — saved, dismissed or seen — do not appear at all (ADR-0011).
 /// </para>
 /// </remarks>
 public static class GetRecommendations

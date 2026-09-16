@@ -380,6 +380,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/movies/{id}/response": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Say what you want to do about a film
+         * @description Records Saved, NotInterested or Seen. Saved films form the watchlist; all three stop the film being recommended again.
+         */
+        put: operations["RespondToMovie"];
+        post?: never;
+        /**
+         * Withdraw your response to a film
+         * @description Removes a Saved or NotInterested response, taking the film off the watchlist or un-hiding it. Does not remove a recorded viewing.
+         */
+        delete: operations["WithdrawMovieResponse"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the signed-in user's watchlist
+         * @description Returns the films the user has saved, most recently saved first, each with where it can be watched in their region.
+         */
+        get: operations["GetWatchlist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -625,6 +669,11 @@ export interface components {
              *     anonymous visitors, since availability depends on who is asking.
              */
             watch: components["schemas"]["WatchingOptions"];
+            /**
+             * @description Where this film stands for the signed-in viewer — saved, dismissed or seen.
+             *     Neutral for anonymous visitors, for the same reason.
+             */
+            response: components["schemas"]["MovieResponseState"];
         };
         /** @description The signed-in user's rating of a film. */
         MovieRating: {
@@ -643,6 +692,27 @@ export interface components {
              * @description When the rating was last set or changed.
              */
             ratedAt: string;
+        };
+        /** @description Where a film stands for the signed-in user. */
+        MovieResponseState: {
+            /**
+             * Format: uuid
+             * @description The film.
+             */
+            movieId: string;
+            /**
+             * @description `Saved`, `NotInterested`, or null when there is no standing response —
+             *     including after `Seen`, which is recorded as a viewing rather than a
+             *     response.
+             */
+            response: null | string;
+            /** @description Whether the user has any viewing of this film. */
+            watched: boolean;
+            /**
+             * Format: date-time
+             * @description When the response was given, when there is one.
+             */
+            respondedAt: null | string;
         };
         /** @description Summary view of a film. */
         MovieSummary: {
@@ -802,6 +872,47 @@ export interface components {
              */
             movieId: string;
         };
+        /** @description What the user wants to do about a film. */
+        RespondToMovieRequest: {
+            /** @description One of `Saved`, `NotInterested` or `Seen`. */
+            response: null | string;
+        };
+        /** @description One saved film. */
+        SavedFilm: {
+            /**
+             * Format: uuid
+             * @description NextMovie identifier.
+             */
+            movieId: string;
+            /** @description Display title. */
+            title: string;
+            /** @description Relative TMDb poster path. */
+            posterPath: null | string;
+            /**
+             * Format: date
+             * @description Release date, when known.
+             */
+            releaseDate: null | string;
+            /**
+             * Format: int32
+             * @description Runtime in minutes, when known.
+             */
+            runtime: null | number;
+            /**
+             * Format: double
+             * @description TMDb community rating 0–10.
+             */
+            averageRating: null | number;
+            /** @description Genre names, alphabetically. */
+            genres: string[];
+            /**
+             * Format: date-time
+             * @description When it was saved.
+             */
+            savedAt: string;
+            /** @description Where the user can watch it, in their region. */
+            watch: components["schemas"]["WatchingOptions"];
+        };
         /** @description A page of search results. */
         SearchMoviesResponse: {
             /**
@@ -909,6 +1020,11 @@ export interface components {
             known: boolean;
             /** @description Where to send the viewer, when the source suggests somewhere. */
             link: null | string;
+        };
+        /** @description Films saved for later. */
+        WatchlistResponse: {
+            /** @description Most recently saved first. Empty when nothing is saved. */
+            films: components["schemas"]["SavedFilm"][];
         };
     };
     responses: never;
@@ -1747,6 +1863,119 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RespondToMovie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RespondToMovieRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovieResponseState"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    WithdrawMovieResponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovieResponseState"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistResponse"];
                 };
             };
             /** @description Unauthorized */

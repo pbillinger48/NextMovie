@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using NextMovie.Api.Domain;
 using NextMovie.Api.Domain.Streaming;
+using NextMovie.Api.Features.Recommendations;
 using NextMovie.Api.Features.Streaming;
 using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.Persistence;
@@ -91,7 +92,14 @@ public static class GetMovieDetails
         // nothing about where to watch it.
         var watch = await WatchOptionsAsync(caller, movie, db, availability, cancellationToken);
 
-        return TypedResults.Ok(ToDetails(movie, watch));
+        // Likewise personal: whether this film is saved, dismissed or already
+        // seen is a fact about the caller, so an anonymous visitor gets the
+        // neutral state rather than somebody else's.
+        var response = caller.GetUserId() is { } viewer
+            ? await RespondToMovie.StateAsync(db, viewer, movie.Id, cancellationToken)
+            : new MovieResponseState(movie.Id, Response: null, Watched: false, RespondedAt: null);
+
+        return TypedResults.Ok(ToDetails(movie, watch, response));
     }
 
     private static bool NeedsEnriching(Movie movie, DateTimeOffset now) =>
@@ -181,7 +189,10 @@ public static class GetMovieDetails
             : WatchOptions.Unknown;
     }
 
-    private static MovieDetails ToDetails(Movie movie, WatchOptions watch) => new(
+    private static MovieDetails ToDetails(
+        Movie movie,
+        WatchOptions watch,
+        MovieResponseState response) => new(
         Id: movie.Id,
         TmdbId: movie.TmdbId,
         Title: movie.Title,
@@ -202,7 +213,8 @@ public static class GetMovieDetails
             watch.RentOrBuy,
             watch.CanStreamNow,
             watch.Known,
-            watch.Link));
+            watch.Link),
+        Response: response);
 }
 
 /// <summary>Everything the catalogue holds about a film.</summary>
@@ -230,6 +242,10 @@ public static class GetMovieDetails
 /// Where the signed-in viewer can watch it. Empty and <c>known: false</c> for
 /// anonymous visitors, since availability depends on who is asking.
 /// </param>
+/// <param name="Response">
+/// Where this film stands for the signed-in viewer — saved, dismissed or seen.
+/// Neutral for anonymous visitors, for the same reason.
+/// </param>
 public sealed record MovieDetails(
     Guid Id,
     int TmdbId,
@@ -245,4 +261,5 @@ public sealed record MovieDetails(
     string? Language,
     string? Status,
     IReadOnlyList<string> Genres,
-    WatchingOptions Watch);
+    WatchingOptions Watch,
+    MovieResponseState Response);

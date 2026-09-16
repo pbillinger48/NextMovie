@@ -13,6 +13,7 @@ using NextMovie.Api.Features.Ratings;
 using NextMovie.Api.Features.Recommendations;
 using NextMovie.Api.Features.Streaming;
 using NextMovie.Api.Features.Users;
+using NextMovie.Api.Features.Watchlist;
 using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.Auth.Google;
 using NextMovie.Api.Infrastructure.ErrorHandling;
@@ -200,6 +201,9 @@ GetImportReview.Map(app);
 ResolveImportItem.Map(app);
 GetStreamingSettings.Map(app);
 UpdateStreamingSettings.Map(app);
+RespondToMovie.Map(app);
+WithdrawMovieResponse.Map(app);
+GetWatchlist.Map(app);
 
 app.Run();
 

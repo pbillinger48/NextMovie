@@ -26,6 +26,9 @@ export type RecommendedFilm = components["schemas"]["RecommendedFilm"];
 export type StreamingSettingsResponse = components["schemas"]["StreamingSettingsResponse"];
 export type StreamingServiceOption = components["schemas"]["StreamingServiceOption"];
 export type CountryOption = components["schemas"]["CountryOption"];
+export type MovieResponseState = components["schemas"]["MovieResponseState"];
+export type WatchlistResponse = components["schemas"]["WatchlistResponse"];
+export type SavedFilm = components["schemas"]["SavedFilm"];
 
 export type { paths };
 
