@@ -137,6 +137,7 @@ internal sealed class MovieCatalog(NextMovieDbContext db, ILogger<MovieCatalog> 
         current.BackdropPath = incoming.BackdropPath;
         current.ReleaseDate = incoming.ReleaseDate;
         current.AverageRating = incoming.AverageRating;
+        current.VoteCount = incoming.VoteCount;
         current.Popularity = incoming.Popularity;
         current.Language = incoming.Language;
 

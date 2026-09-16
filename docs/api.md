@@ -498,6 +498,12 @@ say nothing useful about a documentary if none of them are documentaries.
 enough to reason from. Falling back to whatever is popular would be a different
 product wearing this one's clothes.
 
+**Only films worth an evening are returned**
+([ADR-0009](adr/0009-recommend-only-films-worth-an-evening.md)): at least 6.5 on
+TMDb, at least 5,000 votes, and already released. Applied as a floor before
+ranking rather than as a penalty within it, so a weak film cannot win on other
+grounds. A shorter list of good films beats a full one with duds in it.
+
 **No single genre may fill a response.** A library that is 40% drama otherwise
 produces a list of twelve dramas — honest scores, useless list. A cap trades a
 little fidelity for a list worth scanning.

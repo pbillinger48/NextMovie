@@ -43,13 +43,15 @@ public sealed class RecommendationScorerTests
         return TasteProfileBuilder.Build(ratings, watched);
     }
 
+    private static readonly DateOnly Today = new(2026, 9, 16);
+
     private static RecommendationCandidate Candidate(
         int genre = SciFi,
         int? runtime = 120,
         int? year = 2016,
         double? community = 7.0,
-        double? popularity = 50) =>
-        new(Guid.CreateVersion7(), [genre], runtime, year, community, popularity);
+        int? votes = 20_000) =>
+        new(Guid.CreateVersion7(), [genre], runtime, new DateOnly(year ?? 2016, 1, 1), community, votes);
 
     [Fact]
     public void A_film_in_a_loved_genre_outranks_one_in_a_disliked_genre()
@@ -79,23 +81,104 @@ public sealed class RecommendationScorerTests
     }
 
     [Fact]
-    public void Popularity_cannot_outweigh_taste()
+    public void How_many_people_saw_it_does_not_decide()
     {
         var profile = SciFiFan();
 
-        var blockbusterInTheWrongGenre = RecommendationScorer.Score(
-            Candidate(Horror, community: 7.0, popularity: 5000),
+        var widelySeenWrongGenre = RecommendationScorer.Score(
+            Candidate(Horror, community: 7.0, votes: 50_000),
             profile,
             GenreNames);
 
-        var quietFilmInTheRightGenre = RecommendationScorer.Score(
-            Candidate(SciFi, community: 7.0, popularity: 3),
+        var lessSeenRightGenre = RecommendationScorer.Score(
+            Candidate(SciFi, community: 7.0, votes: 400),
             profile,
             GenreNames);
 
-        // Ranking by popularity would recommend the same films to everybody,
-        // which is the failure mode this weighting exists to avoid.
-        Assert.True(quietFilmInTheRightGenre.Score > blockbusterInTheWrongGenre.Score);
+        // Vote count decides whether a rating is believed, never how good the
+        // film is. Otherwise everybody gets recommended the same blockbusters.
+        Assert.True(lessSeenRightGenre.Score > widelySeenWrongGenre.Score);
+    }
+
+    // --- the quality floor ---
+
+    [Theory]
+    [InlineData(6.4)]
+    [InlineData(5.0)]
+    [InlineData(2.0)]
+    public void A_poorly_rated_film_is_not_worth_recommending(double rating)
+    {
+        Assert.False(RecommendationScorer.IsWorthRecommending(Candidate(community: rating), Today));
+    }
+
+    [Fact]
+    public void A_well_rated_film_is_worth_recommending()
+    {
+        Assert.True(RecommendationScorer.IsWorthRecommending(Candidate(community: 7.6), Today));
+    }
+
+    [Fact]
+    public void A_high_rating_from_a_handful_of_people_is_not_believed()
+    {
+        // Nine out of ten from twelve people is not evidence about a film.
+        Assert.False(RecommendationScorer.IsWorthRecommending(Candidate(community: 9.0, votes: 12), Today));
+    }
+
+    [Fact]
+    public void An_unknown_vote_count_is_judged_on_rating_alone()
+    {
+        // Most of the catalogue predates the vote count being stored; excluding
+        // all of it would be worse than trusting the rating.
+        Assert.True(RecommendationScorer.IsWorthRecommending(Candidate(community: 7.8, votes: null), Today));
+    }
+
+    [Fact]
+    public void An_unrated_film_is_not_recommended()
+    {
+        Assert.False(RecommendationScorer.IsWorthRecommending(Candidate(community: null), Today));
+
+    }
+
+    [Fact]
+    public void A_film_that_is_not_out_yet_is_never_recommended()
+    {
+        // The most flattering ratings on TMDb belong to films nobody has been
+        // disappointed by yet — and you cannot watch them tonight regardless.
+        var unreleased = new RecommendationCandidate(
+            Guid.CreateVersion7(), [SciFi], 120, Today.AddMonths(3), 9.2, 20_000);
+
+        Assert.False(RecommendationScorer.IsWorthRecommending(unreleased, Today));
+    }
+
+    [Fact]
+    public void Quality_beats_taste_when_they_disagree()
+    {
+        var profile = SciFiFan();
+
+        var excellentButWrongGenre = RecommendationScorer.Score(
+            Candidate(Horror, community: 8.6), profile, GenreNames);
+
+        var mediocreInTheRightGenre = RecommendationScorer.Score(
+            Candidate(SciFi, community: 6.6), profile, GenreNames);
+
+        // The correction this weighting exists for: an earlier version returned
+        // films rated 6.0 from a catalogue full of films rated above 8, because
+        // taste could outvote quality.
+        Assert.True(
+            excellentButWrongGenre.Score > mediocreInTheRightGenre.Score,
+            $"8.6 in the wrong genre {excellentButWrongGenre.Score:0.000} should beat "
+            + $"6.6 in the right one {mediocreInTheRightGenre.Score:0.000}");
+    }
+
+    [Fact]
+    public void A_great_film_leads_with_why_it_is_great()
+    {
+        var recommendation = RecommendationScorer.Score(
+            Candidate(SciFi, community: 8.6), SciFiFan(), GenreNames);
+
+        // Quality mostly decides the ranking now, so an explanation opening with
+        // a genre would be explaining the wrong thing.
+        Assert.StartsWith("Widely considered excellent", recommendation.Reasons[0]);
     }
 
     [Fact]
@@ -158,7 +241,7 @@ public sealed class RecommendationScorerTests
     public void A_film_with_nothing_to_recommend_it_claims_nothing()
     {
         var recommendation = RecommendationScorer.Score(
-            Candidate(Documentary, runtime: 300, year: 1950, community: 4.0),
+            Candidate(Documentary, runtime: 300, year: 1950, community: 6.6),
             SciFiFan(),
             GenreNames);
 
@@ -174,7 +257,7 @@ public sealed class RecommendationScorerTests
         var mediocre = RecommendationScorer.Score(Candidate(community: 5.5), SciFiFan(), GenreNames);
 
         Assert.Contains(wellReviewed.Reasons, reason => reason.Contains("8.2"));
-        Assert.DoesNotContain(mediocre.Reasons, reason => reason.Contains("wider audience"));
+        Assert.DoesNotContain(mediocre.Reasons, reason => reason.Contains("TMDb"));
     }
 
     // --- confidence ---
@@ -214,12 +297,12 @@ public sealed class RecommendationScorerTests
             [.. Enumerable.Repeat(new WatchedFilm([Animation]), 100)]);
 
         var acclaimed = RecommendationScorer.Score(
-            new RecommendationCandidate(Guid.CreateVersion7(), [Animation], 100, 2016, 8.6, 60),
+            new RecommendationCandidate(Guid.CreateVersion7(), [Animation], 100, new DateOnly(2016, 1, 1), 8.6, 20_000),
             breadthWatcher,
             GenreNames);
 
         var forgettable = RecommendationScorer.Score(
-            new RecommendationCandidate(Guid.CreateVersion7(), [Animation], 100, 2016, 5.2, 60),
+            new RecommendationCandidate(Guid.CreateVersion7(), [Animation], 100, new DateOnly(2016, 1, 1), 5.2, 20_000),
             breadthWatcher,
             GenreNames);
 
