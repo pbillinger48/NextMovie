@@ -28,6 +28,7 @@ Where an ADR and `docs/` disagree, **the ADR wins** — the product docs predate
 | [0008](0008-recommendations-from-tmdb-relatedness.md) | Recommend from TMDb relatedness, scored against a computed taste profile | Accepted |
 | [0009](0009-recommend-only-films-worth-an-evening.md) | Recommend only films worth an evening | Accepted |
 | [0010](0010-streaming-availability.md) | Streaming availability, per region, cached daily | Accepted |
+| [0011](0011-recommendation-responses.md) | Recommendation responses, and the watchlist as one of them | Accepted |
 
 ## Template
 
