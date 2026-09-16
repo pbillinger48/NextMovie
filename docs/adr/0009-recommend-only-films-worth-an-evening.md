@@ -1,6 +1,6 @@
 # ADR-0009: Recommend only films worth an evening
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-16
 - **Amends:** [ADR-0008](0008-recommendations-from-tmdb-relatedness.md) — candidate sources and quality
 

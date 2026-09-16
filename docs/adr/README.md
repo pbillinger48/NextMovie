@@ -26,7 +26,8 @@ Where an ADR and `docs/` disagree, **the ADR wins** — the product docs predate
 | [0006](0006-ratings-and-watch-history.md) | Ratings and watch history | Accepted |
 | [0007](0007-database-backed-import-jobs.md) | Import jobs live in the database and are worked in-process | Accepted |
 | [0008](0008-recommendations-from-tmdb-relatedness.md) | Recommend from TMDb relatedness, scored against a computed taste profile | Accepted |
-| [0009](0009-recommend-only-films-worth-an-evening.md) | Recommend only films worth an evening | Proposed |
+| [0009](0009-recommend-only-films-worth-an-evening.md) | Recommend only films worth an evening | Accepted |
+| [0010](0010-streaming-availability.md) | Streaming availability, per region, cached daily | Proposed |
 
 ## Template
 
