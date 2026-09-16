@@ -356,6 +356,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me/streaming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the signed-in user's streaming settings
+         * @description Returns the user's region, the countries they may choose from, and the services on offer there with their subscriptions marked.
+         */
+        get: operations["GetStreamingSettings"];
+        /**
+         * Update the signed-in user's streaming settings
+         * @description Replaces the region and the set of subscribed services. Services absent from the request are treated as cancelled.
+         */
+        put: operations["UpdateStreamingSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -392,6 +416,13 @@ export interface components {
             refreshTokenExpiresAt: string;
             /** @description The signed-in account. */
             user: components["schemas"]["AuthenticatedUser"];
+        };
+        /** @description One country on offer. */
+        CountryOption: {
+            /** @description ISO 3166-1 alpha-2 code. */
+            code: string;
+            /** @description English name, for display. */
+            name: string;
         };
         /** @description Response body returned by the health endpoint. */
         HealthResponse: {
@@ -796,12 +827,50 @@ export interface components {
             /** @description An ID token obtained by the client from Google. */
             idToken: null | string;
         };
+        /** @description One service, and whether this person says they have it. */
+        StreamingServiceOption: {
+            /**
+             * Format: int32
+             * @description Provider identifier, the same one offers on films carry.
+             */
+            id: number;
+            /** @description Name to show. */
+            name: string;
+            /** @description Relative logo path, when the source has one. */
+            logoPath: null | string;
+            /** @description Whether this person has said they subscribe. */
+            subscribed: boolean;
+            /**
+             * @description Whether the service operates in their country. False only for something they
+             *     ticked before moving — see the remarks on StreamingSettings.
+             */
+            offeredHere: boolean;
+        };
+        /** @description Where a person watches, and what they pay for. */
+        StreamingSettingsResponse: {
+            /** @description The country their availability is answered for, as ISO 3166-1 alpha-2. */
+            region: string;
+            /** @description Countries they may choose between, ordered by name. */
+            countries: components["schemas"]["CountryOption"][];
+            /** @description Services they may tick, most prominent in their country first. */
+            services: components["schemas"]["StreamingServiceOption"][];
+        };
         /** @description The new state of the editable profile. */
         UpdateCurrentUserRequest: {
             /** @description Name to show in the UI. Required. */
             displayName: null | string;
             /** @description Absolute http or https avatar URL. Omit or send null to clear it. */
             profileImageUrl: null | string;
+        };
+        /** @description The new state of someone's streaming settings. */
+        UpdateStreamingSettingsRequest: {
+            /** @description ISO 3166-1 alpha-2 country code. Required. */
+            region: null | string;
+            /**
+             * @description Every service they subscribe to. Omit or send an empty list to say they have
+             *     none — this replaces the set rather than adding to it.
+             */
+            providerIds: null | number[];
         };
         /** @description A user's own profile. */
         UserProfileResponse: {
@@ -1611,6 +1680,77 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetStreamingSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreamingSettingsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateStreamingSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStreamingSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreamingSettingsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

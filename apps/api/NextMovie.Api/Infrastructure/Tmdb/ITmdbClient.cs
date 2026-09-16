@@ -54,6 +54,18 @@ internal interface ITmdbClient
         int minimumVotes,
         CancellationToken cancellationToken);
 
+    /// <summary>Every service TMDb lists in one country.</summary>
+    /// <remarks>
+    /// The catalogue behind the settings screen. It has to come from upstream
+    /// rather than from the services we have happened to see on films already:
+    /// those arrive only as availability is looked up, so a new account would be
+    /// offered an empty list and could never say what it subscribes to.
+    /// </remarks>
+    /// <param name="region">ISO 3166-1 alpha-2 country code.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="TmdbException">TMDb was unreachable or returned a failure.</exception>
+    Task<TmdbProviderListResponse> GetProvidersAsync(string region, CancellationToken cancellationToken);
+
     /// <summary>Where a film can be watched, by country.</summary>
     /// <param name="tmdbId">The film.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

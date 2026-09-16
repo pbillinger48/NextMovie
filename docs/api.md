@@ -290,6 +290,81 @@ endpoint, not a field on a profile save. Neither is built yet.
 
 ---
 
+## Streaming Settings
+
+`GET /api/v1/users/me/streaming`
+
+Where this person watches and what they pay for — the settings that turn
+"streaming somewhere" into "streaming on something you have"
+([ADR-0010](adr/0010-streaming-availability.md)).
+
+```json
+{
+  "region": "US",
+  "countries": [{ "code": "AF", "name": "Afghanistan" }],
+  "services": [
+    {
+      "id": 8,
+      "name": "Netflix",
+      "logoPath": "/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg",
+      "subscribed": true,
+      "offeredHere": true
+    }
+  ]
+}
+```
+
+**Its own resource, not fields on the profile.** The service list is fetched from
+an external catalogue and runs to a hundred entries; putting it on
+`GET /users/me` would make every profile read pay for it, including the one the
+site header does on every page.
+
+`countries` is every ISO 3166-1 alpha-2 country, ordered by name — not only the
+ones our availability source covers. Narrowing it would mean another upstream
+call and another cache, and the failure it would prevent is already visible:
+choose a country nothing is known about and `services` comes back empty.
+
+`services` is the country's catalogue, ordered as the source ranks it for that
+country rather than alphabetically. **`offeredHere: false` means a service the
+user subscribes to that this country does not offer** — someone who ticked it and
+then moved. It is listed rather than dropped: the subscription is still stored and
+still shaping recommendations, so hiding it would leave no way to undo it.
+
+| Status | When |
+|---|---|
+| `401` | Not signed in. |
+
+---
+
+## Update Streaming Settings
+
+`PUT /api/v1/users/me/streaming`
+
+```json
+{
+  "region": "GB",
+  "providerIds": [8, 1899]
+}
+```
+
+Returns the updated settings, in the same shape as `GET`.
+
+**`PUT` replaces.** A service absent from `providerIds` is cancelled — that is the
+only way unticking one can mean anything. An empty list says "I subscribe to
+nothing", which is a real answer.
+
+**Region and services move together** because they are one decision. Saving them
+separately would leave a window where the region said Britain and the services
+were the American ones, and anything recommended in that window would be
+confidently wrong.
+
+| Status | When |
+|---|---|
+| `400` | Missing region, a code that is not ISO 3166-1 alpha-2, an unknown service id, or more than 50 services. |
+| `401` | As above. |
+
+---
+
 # Movies
 
 ## Search Movies

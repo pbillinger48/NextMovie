@@ -23,6 +23,9 @@ export type ImportCandidate = components["schemas"]["ImportCandidate"];
 export type MovieRating = components["schemas"]["MovieRating"];
 export type RecommendationsResponse = components["schemas"]["RecommendationsResponse"];
 export type RecommendedFilm = components["schemas"]["RecommendedFilm"];
+export type StreamingSettingsResponse = components["schemas"]["StreamingSettingsResponse"];
+export type StreamingServiceOption = components["schemas"]["StreamingServiceOption"];
+export type CountryOption = components["schemas"]["CountryOption"];
 
 export type { paths };
 

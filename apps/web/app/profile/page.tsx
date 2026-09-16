@@ -50,6 +50,20 @@ export default async function ProfilePage() {
       />
 
       <div className="flex flex-col items-start gap-2 border-t border-neutral-200 pt-6 dark:border-neutral-800">
+        <h2 className="font-medium">Where you watch</h2>
+        <p className="max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
+          Your country and the services you subscribe to decide which
+          recommendations say you can watch them tonight.
+        </p>
+        <Link
+          href="/profile/streaming"
+          className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >
+          Streaming settings
+        </Link>
+      </div>
+
+      <div className="flex flex-col items-start gap-2 border-t border-neutral-200 pt-6 dark:border-neutral-800">
         <h2 className="font-medium">Your films</h2>
         <p className="max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
           Bring your ratings and watch history across from Letterboxd.

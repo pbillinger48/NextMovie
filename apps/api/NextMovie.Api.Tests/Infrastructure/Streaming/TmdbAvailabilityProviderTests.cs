@@ -187,5 +187,8 @@ public sealed class TmdbAvailabilityProviderTests
 
         public Task<TmdbSearchResponse> DiscoverBestInGenreAsync(int genreId, int minimumVotes, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+
+        public Task<TmdbProviderListResponse> GetProvidersAsync(string region, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }
