@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NextMovie.Api.Domain;
 using NextMovie.Api.Domain.Import;
+using NextMovie.Api.Domain.Recommendations;
 using NextMovie.Api.Domain.Streaming;
 using NextMovie.Api.Infrastructure.Persistence.Configurations;
 
@@ -32,6 +33,8 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
 
     public DbSet<RecommendationEvent> RecommendationEvents => Set<RecommendationEvent>();
 
+    public DbSet<RecommendationResponse> RecommendationResponses => Set<RecommendationResponse>();
+
     public DbSet<StreamingProvider> StreamingProviders => Set<StreamingProvider>();
 
     public DbSet<MovieAvailability> MovieAvailability => Set<MovieAvailability>();
@@ -57,6 +60,7 @@ public sealed class NextMovieDbContext(DbContextOptions<NextMovieDbContext> opti
         modelBuilder.ApplyConfiguration(new ImportJobConfiguration());
         modelBuilder.ApplyConfiguration(new ImportItemConfiguration());
         modelBuilder.ApplyConfiguration(new RecommendationEventConfiguration());
+        modelBuilder.ApplyConfiguration(new RecommendationResponseConfiguration());
         modelBuilder.ApplyConfiguration(new StreamingProviderConfiguration());
         modelBuilder.ApplyConfiguration(new MovieAvailabilityConfiguration());
         modelBuilder.ApplyConfiguration(new AvailabilityOfferConfiguration());

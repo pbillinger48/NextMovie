@@ -290,6 +290,45 @@ endpoint, not a field on a profile save. Neither is built yet.
 
 ---
 
+## Watchlist
+
+`GET /api/v1/users/me/watchlist`
+
+The films the user has saved, most recently saved first, each with where it can
+be watched in their region.
+
+```json
+{
+  "films": [
+    {
+      "movieId": "0199...",
+      "title": "Heat",
+      "posterPath": "/umSVjVdbVwtx5ryCA2QXL44Durm.jpg",
+      "releaseDate": "1995-12-15",
+      "runtime": 170,
+      "averageRating": 7.9,
+      "genres": ["Action", "Crime", "Drama"],
+      "savedAt": "2026-09-16T21:40:00Z",
+      "watch": { "streamingOn": ["Netflix"], "canStreamNow": true }
+    }
+  ]
+}
+```
+
+**There is no watchlist table.** The watchlist *is* the set of films answered
+`Saved` ([ADR-0011](adr/0011-recommendation-responses.md)); this endpoint is a
+query over them. Two tables would let "saved" and "on the watchlist" disagree.
+
+Films are added and removed through the response endpoints below, not here. At
+most 100 are returned — availability costs an upstream call per film on a cold
+cache, so an unbounded list would be an unbounded page load.
+
+| Status | When |
+|---|---|
+| `401` | Not signed in. |
+
+---
+
 ## Streaming Settings
 
 `GET /api/v1/users/me/streaming`
@@ -364,6 +403,74 @@ confidently wrong.
 | `401` | As above. |
 
 ---
+
+---
+
+## Respond to a Film
+
+`PUT /api/v1/movies/{id}/response`
+
+```json
+{ "response": "Saved" }
+```
+
+What the user wants to do about a film: `Saved`, `NotInterested`, or `Seen`.
+Returns where the film now stands:
+
+```json
+{
+  "movieId": "0199...",
+  "response": "Saved",
+  "watched": false,
+  "respondedAt": "2026-09-16T21:40:00Z"
+}
+```
+
+**`PUT`, because a person has one current answer about a film.** Saving twice
+leaves it saved once; saving something previously dismissed replaces the
+dismissal rather than storing a contradiction.
+
+**`Seen` is not stored as a response.** It records a viewing instead — the same
+place ratings put one, with a null date, because saying you have seen a film says
+nothing about when ([ADR-0006](adr/0006-ratings-and-watch-history.md),
+[ADR-0011](adr/0011-recommendation-responses.md)). So `response` comes back
+`null` and `watched` comes back `true`. It also withdraws any earlier `Saved` or
+`NotInterested`, which were statements about a film the user had not seen.
+
+**All three stop the film being recommended again.** Before this, the only way to
+stop seeing a film was to go and watch it.
+
+The impression that prompted the response is recorded against it, resolved on the
+server. **Clients do not send an event id** — one could attribute a response to
+somebody else's impression, corrupting exactly the data this collects.
+
+| Status | When |
+|---|---|
+| `400` | A response that is not one of the three. |
+| `401` | Not signed in. |
+| `404` | No film with that identifier is in the catalogue. |
+
+---
+
+## Withdraw a Response
+
+`DELETE /api/v1/movies/{id}/response`
+
+Takes a film off the watchlist, or un-hides a dismissed one — the same operation,
+because they are the same row. Returns the resulting state, in the same shape as
+`PUT`.
+
+**Idempotent**, and no `404` for a film with no response: the caller asked for
+there to be none, and there is none. Clients undo from a list that may already
+have moved on.
+
+**It does not un-watch anything.** Deleting viewings is a capability ADR-0006 does
+not cover, and silently removing one here would destroy history this endpoint was
+never asked about — so a film marked `Seen` still comes back `watched: true`.
+
+| Status | When |
+|---|---|
+| `401` | Not signed in. |
 
 # Movies
 

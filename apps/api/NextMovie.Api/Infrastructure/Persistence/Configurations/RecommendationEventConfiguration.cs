@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NextMovie.Api.Domain;
+using NextMovie.Api.Domain.Recommendations;
 
 namespace NextMovie.Api.Infrastructure.Persistence.Configurations;
 
@@ -40,5 +41,49 @@ public sealed class RecommendationEventConfiguration : IEntityTypeConfiguration<
             // A film is shared catalogue data; deleting one must not erase the
             // record of what was recommended.
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>Maps <see cref="RecommendationResponse"/> to the <c>recommendation_responses</c> table.</summary>
+public sealed class RecommendationResponseConfiguration : IEntityTypeConfiguration<RecommendationResponse>
+{
+    public void Configure(EntityTypeBuilder<RecommendationResponse> builder)
+    {
+        builder.HasKey(response => response.Id);
+
+        builder.Property(response => response.Kind)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        // One current answer per person per film. Without this the exclusion rule
+        // and the watchlist could both be right and disagree.
+        builder.HasIndex(response => new { response.UserId, response.MovieId }).IsUnique();
+
+        // The watchlist reads exactly this: one person's saved films, newest
+        // first.
+        builder.HasIndex(response => new { response.UserId, response.Kind, response.RespondedAt });
+
+        builder
+            .HasOne(response => response.User)
+            .WithMany()
+            .HasForeignKey(response => response.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder
+            .HasOne(response => response.Movie)
+            .WithMany()
+            .HasForeignKey(response => response.MovieId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder
+            .HasOne(response => response.RecommendationEvent)
+            .WithMany()
+            .HasForeignKey(response => response.RecommendationEventId)
+
+            // The response outlives the impression it came from. Losing the
+            // attribution is a loss of training detail; losing the response would
+            // be a loss of what the person actually told us.
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

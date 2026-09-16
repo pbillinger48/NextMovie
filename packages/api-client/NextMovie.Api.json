@@ -1071,6 +1071,152 @@
           }
         }
       }
+    },
+    "/api/v1/movies/{id}/response": {
+      "put": {
+        "tags": [
+          "RespondToMovie"
+        ],
+        "summary": "Say what you want to do about a film",
+        "description": "Records Saved, NotInterested or Seen. Saved films form the watchlist; all three stop the film being recommended again.",
+        "operationId": "RespondToMovie",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondToMovieRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieResponseState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "WithdrawMovieResponse"
+        ],
+        "summary": "Withdraw your response to a film",
+        "description": "Removes a Saved or NotInterested response, taking the film off the watchlist or un-hiding it. Does not remove a recorded viewing.",
+        "operationId": "WithdrawMovieResponse",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieResponseState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me/watchlist": {
+      "get": {
+        "tags": [
+          "GetWatchlist"
+        ],
+        "summary": "Get the signed-in user's watchlist",
+        "description": "Returns the films the user has saved, most recently saved first, each with where it can be watched in their region.",
+        "operationId": "GetWatchlist",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1497,7 +1643,8 @@
           "language",
           "status",
           "genres",
-          "watch"
+          "watch",
+          "response"
         ],
         "type": "object",
         "properties": {
@@ -1603,6 +1750,10 @@
           "watch": {
             "description": "Where the signed-in viewer can watch it. Empty and `known: false` for\nanonymous visitors, since availability depends on who is asking.",
             "$ref": "#/components/schemas/WatchingOptions"
+          },
+          "response": {
+            "description": "Where this film stands for the signed-in viewer — saved, dismissed or seen.\nNeutral for anonymous visitors, for the same reason.",
+            "$ref": "#/components/schemas/MovieResponseState"
           }
         },
         "description": "Everything the catalogue holds about a film."
@@ -1633,6 +1784,42 @@
           }
         },
         "description": "The signed-in user's rating of a film."
+      },
+      "MovieResponseState": {
+        "required": [
+          "movieId",
+          "response",
+          "watched",
+          "respondedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "description": "The film.",
+            "format": "uuid"
+          },
+          "response": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`Saved`, `NotInterested`, or null when there is no standing response —\nincluding after `Seen`, which is recorded as a viewing rather than a\nresponse."
+          },
+          "watched": {
+            "type": "boolean",
+            "description": "Whether the user has any viewing of this film."
+          },
+          "respondedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the response was given, when there is one.",
+            "format": "date-time"
+          }
+        },
+        "description": "Where a film stands for the signed-in user."
       },
       "MovieSummary": {
         "required": [
@@ -1990,6 +2177,97 @@
         },
         "description": "The film an import row meant."
       },
+      "RespondToMovieRequest": {
+        "required": [
+          "response"
+        ],
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "One of `Saved`, `NotInterested` or `Seen`."
+          }
+        },
+        "description": "What the user wants to do about a film."
+      },
+      "SavedFilm": {
+        "required": [
+          "movieId",
+          "title",
+          "posterPath",
+          "releaseDate",
+          "runtime",
+          "averageRating",
+          "genres",
+          "savedAt",
+          "watch"
+        ],
+        "type": "object",
+        "properties": {
+          "movieId": {
+            "type": "string",
+            "description": "NextMovie identifier.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title."
+          },
+          "posterPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Relative TMDb poster path."
+          },
+          "releaseDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Release date, when known.",
+            "format": "date"
+          },
+          "runtime": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Runtime in minutes, when known.",
+            "format": "int32"
+          },
+          "averageRating": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "TMDb community rating 0–10.",
+            "format": "double"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Genre names, alphabetically."
+          },
+          "savedAt": {
+            "type": "string",
+            "description": "When it was saved.",
+            "format": "date-time"
+          },
+          "watch": {
+            "description": "Where the user can watch it, in their region.",
+            "$ref": "#/components/schemas/WatchingOptions"
+          }
+        },
+        "description": "One saved film."
+      },
       "SearchMoviesResponse": {
         "required": [
           "page",
@@ -2250,6 +2528,22 @@
           }
         },
         "description": "Where a film can be watched, for the person asking."
+      },
+      "WatchlistResponse": {
+        "required": [
+          "films"
+        ],
+        "type": "object",
+        "properties": {
+          "films": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedFilm"
+            },
+            "description": "Most recently saved first. Empty when nothing is saved."
+          }
+        },
+        "description": "Films saved for later."
       }
     }
   },
@@ -2316,6 +2610,15 @@
     },
     {
       "name": "UpdateStreamingSettings"
+    },
+    {
+      "name": "RespondToMovie"
+    },
+    {
+      "name": "WithdrawMovieResponse"
+    },
+    {
+      "name": "GetWatchlist"
     }
   ]
 }

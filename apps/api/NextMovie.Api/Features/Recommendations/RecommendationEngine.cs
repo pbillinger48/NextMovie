@@ -377,7 +377,14 @@ internal sealed class RecommendationEngine(
         }
     }
 
-    /// <summary>Everything this person has already seen or judged.</summary>
+    /// <summary>Everything this person has already seen, judged, or answered about.</summary>
+    /// <remarks>
+    /// Responses count as much as viewings (ADR-0011). Both a saved film and a
+    /// dismissed one have been decided about — one because it is already on the
+    /// watchlist waiting, the other because being shown it again is precisely
+    /// what the user asked us to stop doing. Without this the only way to stop
+    /// seeing a film was to go and watch it.
+    /// </remarks>
     private async Task<HashSet<Guid>> SeenFilmsAsync(Guid userId, CancellationToken cancellationToken)
     {
         var watched = await db.WatchHistory
@@ -392,7 +399,13 @@ internal sealed class RecommendationEngine(
             .Select(rating => rating.MovieId)
             .ToListAsync(cancellationToken);
 
-        return [.. watched, .. rated];
+        var answered = await db.RecommendationResponses
+            .AsNoTracking()
+            .Where(response => response.UserId == userId)
+            .Select(response => response.MovieId)
+            .ToListAsync(cancellationToken);
+
+        return [.. watched, .. rated, .. answered];
     }
 
     /// <summary>

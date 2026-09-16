@@ -210,6 +210,73 @@ internal sealed class UserLibrary(NextMovieDbContext db, ILogger<UserLibrary> lo
     };
 
     /// <summary>
+    /// Records that a user has seen a film, if no viewing of it exists.
+    /// </summary>
+    /// <returns>Whether a viewing was actually added.</returns>
+    /// <remarks>
+    /// The home of "seen it" on a recommendation (ADR-0011). It is a fact about
+    /// viewing rather than an opinion about a recommendation, so it lands in
+    /// <c>watch_history</c> beside every other viewing rather than in a table of
+    /// responses — which keeps one source of truth for "watched" and keeps the film
+    /// in the taste profile built from it.
+    /// <para>
+    /// Does not add a second row for a film already watched. Telling us you have
+    /// seen something is not the same as telling us you watched it again.
+    /// </para>
+    /// </remarks>
+    public async Task<bool> MarkWatchedAsync(
+        Guid userId,
+        Guid movieId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var added = await AddViewingIfNoneAsync(userId, movieId, LibrarySource.Native, now, cancellationToken);
+
+        if (added)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return added;
+    }
+
+    /// <summary>
+    /// Adds a dateless native viewing unless the film already has one.
+    /// </summary>
+    /// <remarks>
+    /// Shared by rating a film and by marking it seen, because both mean the same
+    /// thing — "I have watched this, I am not saying when" — and two copies of the
+    /// rule would drift.
+    /// </remarks>
+    private async Task<bool> AddViewingIfNoneAsync(
+        Guid userId,
+        Guid movieId,
+        LibrarySource source,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (await db.WatchHistory.AnyAsync(
+                entry => entry.UserId == userId && entry.MovieId == movieId,
+                cancellationToken))
+        {
+            return false;
+        }
+
+        // Null date, not today's: saying you have seen a film says nothing about
+        // when, and inventing a date would sort and average wrongly forever after.
+        db.WatchHistory.Add(new WatchHistoryEntry
+        {
+            UserId = userId,
+            MovieId = movieId,
+            WatchedOn = null,
+            Source = source,
+            CreatedAt = now,
+        });
+
+        return true;
+    }
+
+    /// <summary>
     /// Removes a user's rating of a film, if there is one.
     /// </summary>
     /// <returns>Whether a rating was actually removed.</returns>
@@ -263,23 +330,7 @@ internal sealed class UserLibrary(NextMovieDbContext db, ILogger<UserLibrary> lo
             rating.Revise(value, source, now);
         }
 
-        var alreadyWatched = await db.WatchHistory
-            .AnyAsync(entry => entry.UserId == userId && entry.MovieId == movieId, cancellationToken);
-
-        if (!alreadyWatched)
-        {
-            // Null date, not today's: rating a film from memory says nothing
-            // about when it was seen, and inventing a date would sort and average
-            // wrongly forever after.
-            db.WatchHistory.Add(new WatchHistoryEntry
-            {
-                UserId = userId,
-                MovieId = movieId,
-                WatchedOn = null,
-                Source = source,
-                CreatedAt = now,
-            });
-        }
+        await AddViewingIfNoneAsync(userId, movieId, source, now, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
 
