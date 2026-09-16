@@ -36,6 +36,10 @@ export async function SessionNav() {
         What to watch
       </Link>
 
+      <Link href="/watchlist" className="hover:underline underline-offset-4">
+        Watchlist
+      </Link>
+
       <Link
         href="/profile"
         className="text-neutral-600 hover:underline underline-offset-4 dark:text-neutral-400"

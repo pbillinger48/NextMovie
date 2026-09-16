@@ -3,6 +3,8 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 
 import { RatingControl } from "@/app/components/RatingControl";
+import { ResponseButtons } from "@/app/components/ResponseButtons";
+import { WatchOptions } from "@/app/components/WatchOptions";
 import { getMovie } from "@/lib/api";
 import { formatRuntime } from "@/lib/format";
 import { getMyRating } from "@/lib/ratings-api";
@@ -42,7 +44,13 @@ export async function generateMetadata({ params }: MoviePageProps): Promise<Meta
 
 export default async function MoviePage({ params }: MoviePageProps) {
   const { id } = await params;
-  const result = await getMovie(id);
+
+  // Read before the film, not after: availability and the saved state come back
+  // in the film's own response and depend on who is asking.
+  const session = await getSession();
+  const signedIn = isSignedIn(session);
+
+  const result = await getMovie(id, signedIn ? session.accessToken : undefined);
 
   if (!result.ok) {
     if (result.error.kind === "not-found") {
@@ -64,10 +72,7 @@ export default async function MoviePage({ params }: MoviePageProps) {
   const movie = result.data;
   const year = movie.releaseDate?.slice(0, 4);
 
-  // Read after the film, not alongside it: an anonymous visitor asks for no
-  // rating at all, and a signed-in one should not be blocked on it.
-  const session = await getSession();
-  const signedIn = isSignedIn(session);
+  // An anonymous visitor asks for no rating at all.
   const myRating = signedIn ? await getMyRating(session.accessToken, movie.id) : null;
 
   return (
@@ -121,11 +126,23 @@ export default async function MoviePage({ params }: MoviePageProps) {
 
           <Facts movie={movie} year={year} />
 
+          {/* Only for signed-in visitors: availability depends on a region and a
+              set of subscriptions, and the API returns known:false without them. */}
+          {signedIn ? <WatchOptions watch={movie.watch} /> : null}
+
           <RatingControl
             movieId={movie.id}
             rating={myRating?.rating ?? null}
             signedIn={signedIn}
           />
+
+          {signedIn ? (
+            <ResponseButtons
+              movieId={movie.id}
+              response={movie.response.response}
+              watched={movie.response.watched}
+            />
+          ) : null}
 
           {movie.genres.length > 0 ? (
             <ul className="flex flex-wrap gap-2">

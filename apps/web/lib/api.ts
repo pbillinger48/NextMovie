@@ -89,10 +89,15 @@ export type MovieResult =
  * invited to retry. Collapsing them would tell someone a film does not exist
  * because our API blinked.
  */
-export async function getMovie(id: string): Promise<MovieResult> {
+export async function getMovie(id: string, accessToken?: string): Promise<MovieResult> {
   try {
+    // Availability and the saved/dismissed state are both personal, so the API
+    // answers them only for a caller it can identify. Without the token it
+    // returns the anonymous view — which is correct for a signed-out visitor and
+    // silently wrong for everybody else.
     const { data, response } = await api.GET("/api/v1/movies/{id}", {
       params: { path: { id } },
+      ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
     });
 
     if (data) {
