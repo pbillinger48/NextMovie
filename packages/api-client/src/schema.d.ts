@@ -589,6 +589,11 @@ export interface components {
             status: null | string;
             /** @description Genre names, alphabetically. */
             genres: string[];
+            /**
+             * @description Where the signed-in viewer can watch it. Empty and `known: false` for
+             *     anonymous visitors, since availability depends on who is asking.
+             */
+            watch: components["schemas"]["WatchingOptions"];
         };
         /** @description The signed-in user's rating of a film. */
         MovieRating: {
@@ -741,6 +746,8 @@ export interface components {
              *     Possibly empty; never invented.
              */
             reasons: string[];
+            /** @description Where the viewer can watch it, in their region. */
+            watch: components["schemas"]["WatchingOptions"];
         };
         /** @description The refresh token to exchange. */
         RefreshSessionRequest: {
@@ -814,6 +821,25 @@ export interface components {
              * @description When the account was created.
              */
             createdAt: string;
+        };
+        /** @description Where a film can be watched, for the person asking. */
+        WatchingOptions: {
+            /** @description Services the user subscribes to that carry it. Press play. */
+            streamingOn: string[];
+            /** @description Services carrying it that the user has not said they have. */
+            streamingElsewhere: string[];
+            /** @description Services offering it for money on top. Never described as streaming. */
+            rentOrBuy: string[];
+            /** @description Whether it can be watched without paying again. */
+            canStreamNow: boolean;
+            /**
+             * @description Whether availability has been looked up. False means unknown rather than
+             *     unavailable, and clients must say so — TMDb's provider data is not exhaustive,
+             *     and "we do not know" is not "it is nowhere".
+             */
+            known: boolean;
+            /** @description Where to send the viewer, when the source suggests somewhere. */
+            link: null | string;
         };
     };
     responses: never;

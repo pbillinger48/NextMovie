@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NextMovie.Api.Domain.Recommendations;
+using NextMovie.Api.Domain.Streaming;
+using NextMovie.Api.Features.Streaming;
 using NextMovie.Api.Infrastructure.Auth;
 
 namespace NextMovie.Api.Features.Recommendations;
@@ -76,7 +78,14 @@ public static class GetRecommendations
         // order and the reasons are the parts that mean something.
         Rank: recommendation.Rank,
         Confidence: recommendation.Scored.Confidence.ToString(),
-        Reasons: recommendation.Scored.Reasons);
+        Reasons: recommendation.Scored.Reasons,
+        Watch: new WatchingOptions(
+            StreamingOn: recommendation.Watch.StreamingOn,
+            StreamingElsewhere: recommendation.Watch.StreamingElsewhere,
+            RentOrBuy: recommendation.Watch.RentOrBuy,
+            CanStreamNow: recommendation.Watch.CanStreamNow,
+            Known: recommendation.Watch.Known,
+            Link: recommendation.Watch.Link));
 }
 
 /// <summary>Films worth watching next.</summary>
@@ -108,6 +117,7 @@ public sealed record RecommendationsResponse(IReadOnlyList<RecommendedFilm> Reco
 /// Why it ranked where it did, drawn from the factors that actually moved it.
 /// Possibly empty; never invented.
 /// </param>
+/// <param name="Watch">Where the viewer can watch it, in their region.</param>
 public sealed record RecommendedFilm(
     Guid MovieId,
     string Title,
@@ -118,4 +128,6 @@ public sealed record RecommendedFilm(
     IReadOnlyList<string> Genres,
     int Rank,
     string Confidence,
-    IReadOnlyList<string> Reasons);
+    IReadOnlyList<string> Reasons,
+    WatchingOptions Watch);
+

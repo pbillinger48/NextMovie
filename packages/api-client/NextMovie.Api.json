@@ -1396,7 +1396,8 @@
           "popularity",
           "language",
           "status",
-          "genres"
+          "genres",
+          "watch"
         ],
         "type": "object",
         "properties": {
@@ -1498,6 +1499,10 @@
               "type": "string"
             },
             "description": "Genre names, alphabetically."
+          },
+          "watch": {
+            "description": "Where the signed-in viewer can watch it. Empty and `known: false` for\nanonymous visitors, since availability depends on who is asking.",
+            "$ref": "#/components/schemas/WatchingOptions"
           }
         },
         "description": "Everything the catalogue holds about a film."
@@ -1745,7 +1750,8 @@
           "genres",
           "rank",
           "confidence",
-          "reasons"
+          "reasons",
+          "watch"
         ],
         "type": "object",
         "properties": {
@@ -1814,6 +1820,10 @@
               "type": "string"
             },
             "description": "Why it ranked where it did, drawn from the factors that actually moved it.\nPossibly empty; never invented."
+          },
+          "watch": {
+            "description": "Where the viewer can watch it, in their region.",
+            "$ref": "#/components/schemas/WatchingOptions"
           }
         },
         "description": "One recommended film, and why."
@@ -1994,6 +2004,56 @@
           }
         },
         "description": "A user's own profile."
+      },
+      "WatchingOptions": {
+        "required": [
+          "streamingOn",
+          "streamingElsewhere",
+          "rentOrBuy",
+          "canStreamNow",
+          "known",
+          "link"
+        ],
+        "type": "object",
+        "properties": {
+          "streamingOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Services the user subscribes to that carry it. Press play."
+          },
+          "streamingElsewhere": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Services carrying it that the user has not said they have."
+          },
+          "rentOrBuy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Services offering it for money on top. Never described as streaming."
+          },
+          "canStreamNow": {
+            "type": "boolean",
+            "description": "Whether it can be watched without paying again."
+          },
+          "known": {
+            "type": "boolean",
+            "description": "Whether availability has been looked up. False means unknown rather than\nunavailable, and clients must say so — TMDb's provider data is not exhaustive,\nand \"we do not know\" is not \"it is nowhere\"."
+          },
+          "link": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where to send the viewer, when the source suggests somewhere."
+          }
+        },
+        "description": "Where a film can be watched, for the person asking."
       }
     }
   },

@@ -251,9 +251,12 @@ can only ever read or change their own profile.
 |---|---|
 | `401` | No token, an invalid or expired token, or a token whose account no longer exists. |
 
-This page previously promised a taste profile and streaming providers here.
-Neither has a schema and both are deferred, so neither is returned; they will be
-added when the features exist rather than stubbed now.
+`watch` says where the signed-in viewer can see it, in the same shape as
+recommendations. Anonymous visitors get `known: false` and nothing else —
+availability depends on who is asking.
+
+This page previously promised a taste profile here too. It has no schema and is
+deferred, so it is not returned.
 
 ---
 
@@ -473,10 +476,15 @@ ranked against their viewing and rating history
       "genres": ["Crime", "Drama"],
       "rank": 2,
       "confidence": "High",
-      "reasons": [
-        "You watch a lot of Drama and Crime",
-        "Rated 7.9 by the wider audience"
-      ]
+      "reasons": ["Well regarded — 7.9 on TMDb"],
+      "watch": {
+        "streamingOn": ["Netflix"],
+        "streamingElsewhere": [],
+        "rentOrBuy": ["Apple TV"],
+        "canStreamNow": true,
+        "known": true,
+        "link": "https://www.themoviedb.org/movie/550/watch?locale=US"
+      }
     }
   ]
 }
@@ -508,9 +516,21 @@ grounds. A shorter list of good films beats a full one with duds in it.
 produces a list of twelve dramas — honest scores, useless list. A cap trades a
 little fidelity for a list worth scanning.
 
-> **This does not yet answer "where can I watch it".** Streaming availability is
-> out of the first version (ADR-0008), so the product's promise is kept except for
-> its last clause. Clients must not imply otherwise.
+**`watch` says where the signed-in viewer can see it**
+([ADR-0010](adr/0010-streaming-availability.md)), in their region and against the
+services they have said they subscribe to.
+
+- `streamingOn` — services they pay for that carry it. They can press play.
+- `streamingElsewhere` — carried somewhere they have not said they subscribe to,
+  which includes free and ad-supported services needing no subscription.
+- `rentOrBuy` — available for money on top. **Never described as streaming.**
+- `known: false` — nobody has looked it up. That is not the same as unavailable,
+  and clients must not present it as such: TMDb's provider data is not exhaustive.
+
+Availability **ranks** rather than filters. A film you can watch tonight is
+promoted, one unavailable in your region is nudged down, and neither is hidden —
+a great film you would have to rent is still worth knowing about, and filtering
+would empty the page for anyone with one subscription.
 
 ---
 

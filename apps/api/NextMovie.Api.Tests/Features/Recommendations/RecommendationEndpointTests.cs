@@ -27,6 +27,7 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
 {
     private const string Password = "correct horse battery staple";
     private const int SciFiGenre = 878;
+    private const int Netflix = 8;
 
     private static readonly CancellationToken Ct =
         new CancellationTokenSource(TimeSpan.FromMinutes(2)).Token;
@@ -52,7 +53,9 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
     {
         await using var db = postgres.CreateContext();
         await db.Database.ExecuteSqlRawAsync(
-            "delete from recommendation_events; delete from ratings; delete from watch_history; "
+            "delete from availability_offers; delete from movie_availability; "
+            + "delete from user_streaming_providers; delete from streaming_providers; "
+            + "delete from recommendation_events; delete from ratings; delete from watch_history; "
             + "delete from movie_genre; delete from movies; delete from refresh_tokens; delete from users;",
             Ct);
     }
@@ -240,6 +243,91 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
         Assert.DoesNotContain(body.Recommendations, film => film.Title == "Beloved By Its Twelve Fans");
     }
 
+    // --- availability ---
+
+    [Fact]
+    public async Task Recommendations_say_where_you_can_watch_them()
+    {
+        var (client, _) = await SignedInWithHistoryAsync();
+
+        _tmdb.Availability[157336] = new TmdbRegionProviders
+        {
+            Link = "https://example.com/watch",
+            Flatrate = [new TmdbProviderDto { ProviderId = Netflix, ProviderName = "Netflix" }],
+        };
+
+        var body = await ReadAsync(client);
+
+        var interstellar = body.Recommendations.Single(film => film.Title == "Interstellar");
+
+        // Not subscribed to it yet, so it is streamable rather than ready to play.
+        Assert.Equal(["Netflix"], interstellar.Watch.StreamingElsewhere);
+        Assert.True(interstellar.Watch.CanStreamNow);
+        Assert.True(interstellar.Watch.Known);
+    }
+
+    [Fact]
+    public async Task A_film_on_a_service_you_pay_for_is_marked_as_ready_to_play()
+    {
+        var (client, _) = await SignedInWithHistoryAsync();
+        await SubscribeToAsync(Netflix, "Netflix");
+
+        _tmdb.Availability[157336] = new TmdbRegionProviders
+        {
+            Flatrate = [new TmdbProviderDto { ProviderId = Netflix, ProviderName = "Netflix" }],
+        };
+
+        var body = await ReadAsync(client);
+        var interstellar = body.Recommendations.Single(film => film.Title == "Interstellar");
+
+        Assert.Equal(["Netflix"], interstellar.Watch.StreamingOn);
+        Assert.Empty(interstellar.Watch.StreamingElsewhere);
+    }
+
+    [Fact]
+    public async Task What_you_can_watch_tonight_is_promoted()
+    {
+        var (client, _) = await SignedInWithHistoryAsync();
+        await SubscribeToAsync(Netflix, "Netflix");
+
+        var before = (await ReadAsync(client)).Recommendations;
+        var runnerUp = before[1].Title;
+
+        // Put the second-placed film on a service they pay for. It should
+        // overtake — availability reorders good films, which is the whole point
+        // of ranking on it rather than filtering by it.
+        _tmdb.Availability[await TmdbIdForAsync(runnerUp)] = new TmdbRegionProviders
+        {
+            Flatrate = [new TmdbProviderDto { ProviderId = Netflix, ProviderName = "Netflix" }],
+        };
+
+        // The first request cached "available nowhere" for a day, which is the
+        // cache behaving correctly. Clearing it is what makes this a test of
+        // ranking rather than of caching, which is covered separately.
+        await using (var db = postgres.CreateContext())
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                "delete from availability_offers; delete from movie_availability;", Ct);
+        }
+
+        var after = (await ReadAsync(client)).Recommendations;
+
+        Assert.Equal(runnerUp, after[0].Title);
+    }
+
+    [Fact]
+    public async Task A_film_nobody_has_looked_up_claims_nothing_about_where_to_watch_it()
+    {
+        var (client, _) = await SignedInWithHistoryAsync();
+        _tmdb.Failure = null;
+
+        var body = await ReadAsync(client);
+
+        // With no offers anywhere, "we asked and it is nowhere" is a real answer
+        // and is reported as known — unlike a film nobody asked about.
+        Assert.All(body.Recommendations, film => Assert.False(film.Watch.CanStreamNow));
+    }
+
     [Fact]
     public async Task A_tmdb_outage_produces_no_recommendations_rather_than_an_error()
     {
@@ -326,6 +414,35 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
         GenreIds = [SciFiGenre],
     };
 
+    /// <summary>Records that the signed-in user pays for a service.</summary>
+    private async Task SubscribeToAsync(int providerId, string name)
+    {
+        await using var db = postgres.CreateContext();
+
+        var user = await db.Users.FirstAsync(Ct);
+
+        db.StreamingProviders.Add(new NextMovie.Api.Domain.Streaming.StreamingProvider
+        {
+            Id = providerId,
+            Name = name,
+        });
+
+        db.UserStreamingProviders.Add(new NextMovie.Api.Domain.Streaming.UserStreamingProvider
+        {
+            UserId = user.Id,
+            StreamingProviderId = providerId,
+        });
+
+        await db.SaveChangesAsync(Ct);
+    }
+
+    private async Task<int> TmdbIdForAsync(string title)
+    {
+        await using var db = postgres.CreateContext();
+
+        return await db.Movies.Where(movie => movie.Title == title).Select(movie => movie.TmdbId).FirstAsync(Ct);
+    }
+
     private async Task<HttpClient> SignedInClientAsync()
     {
         using var registrar = _factory.CreateClient();
@@ -400,8 +517,24 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
             });
         }
 
-        public Task<TmdbWatchProvidersResponse> GetWatchProvidersAsync(int tmdbId, CancellationToken cancellationToken) =>
-            throw new NotSupportedException("These tests do not ask about availability.");
+        /// <summary>Where each film is available, keyed by TMDb id.</summary>
+        public Dictionary<int, TmdbRegionProviders> Availability { get; } = [];
+
+        public Task<TmdbWatchProvidersResponse> GetWatchProvidersAsync(int tmdbId, CancellationToken cancellationToken)
+        {
+            if (Failure is not null)
+            {
+                return Task.FromException<TmdbWatchProvidersResponse>(Failure);
+            }
+
+            // Absent means available nowhere, which is what TMDb itself returns
+            // for a film with no offers in a country.
+            var results = Availability.TryGetValue(tmdbId, out var offers)
+                ? new Dictionary<string, TmdbRegionProviders> { ["US"] = offers }
+                : [];
+
+            return Task.FromResult(new TmdbWatchProvidersResponse { Id = tmdbId, Results = results });
+        }
 
         public Task<TmdbSearchResponse> SearchMoviesAsync(string title, int page, CancellationToken cancellationToken) =>
             throw new NotSupportedException("These tests do not search.");

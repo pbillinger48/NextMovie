@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using NextMovie.Api.Domain;
+using NextMovie.Api.Domain.Streaming;
+using NextMovie.Api.Features.Streaming;
+using NextMovie.Api.Infrastructure.Auth;
 using NextMovie.Api.Infrastructure.Persistence;
 using NextMovie.Api.Infrastructure.Tmdb;
 
@@ -52,9 +56,11 @@ public static class GetMovieDetails
 
     private static async Task<Results<Ok<MovieDetails>, ProblemHttpResult>> HandleAsync(
         Guid id,
+        ClaimsPrincipal caller,
         NextMovieDbContext db,
         ITmdbClient tmdb,
         MovieCatalog catalog,
+        AvailabilityCatalog availability,
         TimeProvider time,
         ILogger<Program> logger,
         CancellationToken cancellationToken)
@@ -80,7 +86,12 @@ public static class GetMovieDetails
             movie = await EnrichAsync(movie, db, tmdb, catalog, now, logger, cancellationToken);
         }
 
-        return TypedResults.Ok(ToDetails(movie));
+        // Availability is per person — it depends on their region and what they
+        // subscribe to — so an anonymous visitor is told about the film and
+        // nothing about where to watch it.
+        var watch = await WatchOptionsAsync(caller, movie, db, availability, cancellationToken);
+
+        return TypedResults.Ok(ToDetails(movie, watch));
     }
 
     private static bool NeedsEnriching(Movie movie, DateTimeOffset now) =>
@@ -135,7 +146,42 @@ public static class GetMovieDetails
         }
     }
 
-    private static MovieDetails ToDetails(Movie movie) => new(
+    /// <summary>Where the signed-in viewer can watch this, if anyone is signed in.</summary>
+    private static async Task<WatchOptions> WatchOptionsAsync(
+        ClaimsPrincipal caller,
+        Movie movie,
+        NextMovieDbContext db,
+        AvailabilityCatalog availability,
+        CancellationToken cancellationToken)
+    {
+        if (caller.GetUserId() is not { } userId)
+        {
+            return WatchOptions.Unknown;
+        }
+
+        var viewer = await db.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new
+            {
+                user.Region,
+                ProviderIds = user.StreamingProviders.Select(p => p.StreamingProviderId).ToList(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (viewer is null)
+        {
+            return WatchOptions.Unknown;
+        }
+
+        var found = await availability.ForFilmsAsync([movie], viewer.Region, cancellationToken);
+
+        return found.TryGetValue(movie.Id, out var stored)
+            ? WatchOptions.From([.. stored.Offers], viewer.ProviderIds.ToHashSet(), stored.Link)
+            : WatchOptions.Unknown;
+    }
+
+    private static MovieDetails ToDetails(Movie movie, WatchOptions watch) => new(
         Id: movie.Id,
         TmdbId: movie.TmdbId,
         Title: movie.Title,
@@ -149,7 +195,14 @@ public static class GetMovieDetails
         Popularity: movie.Popularity,
         Language: movie.Language,
         Status: movie.Status,
-        Genres: [.. movie.Genres.Select(genre => genre.Name).Order()]);
+        Genres: [.. movie.Genres.Select(genre => genre.Name).Order()],
+        Watch: new WatchingOptions(
+            watch.StreamingOn,
+            watch.StreamingElsewhere,
+            watch.RentOrBuy,
+            watch.CanStreamNow,
+            watch.Known,
+            watch.Link));
 }
 
 /// <summary>Everything the catalogue holds about a film.</summary>
@@ -173,6 +226,10 @@ public static class GetMovieDetails
 /// <param name="Language">ISO 639-1 code of the original language.</param>
 /// <param name="Status">TMDb release status, e.g. <c>Released</c>.</param>
 /// <param name="Genres">Genre names, alphabetically.</param>
+/// <param name="Watch">
+/// Where the signed-in viewer can watch it. Empty and <c>known: false</c> for
+/// anonymous visitors, since availability depends on who is asking.
+/// </param>
 public sealed record MovieDetails(
     Guid Id,
     int TmdbId,
@@ -187,4 +244,5 @@ public sealed record MovieDetails(
     double? Popularity,
     string? Language,
     string? Status,
-    IReadOnlyList<string> Genres);
+    IReadOnlyList<string> Genres,
+    WatchingOptions Watch);

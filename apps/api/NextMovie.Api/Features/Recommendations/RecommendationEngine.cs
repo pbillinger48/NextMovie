@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NextMovie.Api.Domain;
 using NextMovie.Api.Domain.Recommendations;
+using NextMovie.Api.Domain.Streaming;
 using NextMovie.Api.Infrastructure.Persistence;
 using NextMovie.Api.Infrastructure.Tmdb;
 using Dtos = NextMovie.Api.Infrastructure.Tmdb.Dtos;
@@ -20,6 +21,7 @@ internal sealed class RecommendationEngine(
     NextMovieDbContext db,
     ITmdbClient tmdb,
     MovieCatalog catalog,
+    AvailabilityCatalog availability,
     TimeProvider time,
     ILogger<RecommendationEngine> logger)
 {
@@ -138,8 +140,20 @@ internal sealed class RecommendationEngine(
             .OrderByDescending(entry => entry.Scored.Score)
             .ToList();
 
-        var ranked = Diversify(scored, count)
-            .Select((entry, index) => new Recommendation(entry.Movie, entry.Scored, index + 1))
+        // Availability is looked up only for the films with a chance of being
+        // shown. Asking about a hundred candidates to display twelve would be a
+        // hundred upstream calls the first time somebody opened the page.
+        var shortlist = Diversify(scored, count * ShortlistMultiplier);
+        var watchable = await WatchOptionsAsync(userId, shortlist, cancellationToken);
+
+        var ranked = shortlist
+            .Select(entry => entry with
+            {
+                Watch = watchable.GetValueOrDefault(entry.Movie.Id, WatchOptions.Unknown),
+            })
+            .OrderByDescending(entry => entry.Scored.Score + entry.Watch.RankingAdjustment)
+            .Take(count)
+            .Select((entry, index) => new Recommendation(entry.Movie, entry.Scored, entry.Watch, index + 1))
             .ToList();
 
         await RecordAsync(userId, ranked, cancellationToken);
@@ -382,6 +396,55 @@ internal sealed class RecommendationEngine(
     }
 
     /// <summary>
+    /// How many films are shortlisted for each one shown.
+    /// </summary>
+    /// <remarks>
+    /// Availability can reorder the list but should not have to reach far down it
+    /// to find something watchable. Three times the requested count gives it
+    /// room to promote without paying for availability on the whole pool.
+    /// </remarks>
+    private const int ShortlistMultiplier = 3;
+
+    /// <summary>
+    /// What this person can actually do with each shortlisted film.
+    /// </summary>
+    /// <remarks>
+    /// Their region and subscriptions are theirs alone, so this cannot be shared
+    /// between users the way the availability cache underneath it is.
+    /// </remarks>
+    private async Task<Dictionary<Guid, WatchOptions>> WatchOptionsAsync(
+        Guid userId,
+        IReadOnlyList<ScoredMovie> shortlist,
+        CancellationToken cancellationToken)
+    {
+        var viewer = await db.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new
+            {
+                user.Region,
+                ProviderIds = user.StreamingProviders.Select(p => p.StreamingProviderId).ToList(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (viewer is null)
+        {
+            return [];
+        }
+
+        var found = await availability.ForFilmsAsync(
+            [.. shortlist.Select(entry => entry.Movie)],
+            viewer.Region,
+            cancellationToken);
+
+        var subscriptions = viewer.ProviderIds.ToHashSet();
+
+        return found.ToDictionary(
+            entry => entry.Key,
+            entry => WatchOptions.From([.. entry.Value.Offers], subscriptions, entry.Value.Link));
+    }
+
+    /// <summary>
     /// Takes the best films while stopping any one genre filling the list.
     /// </summary>
     /// <remarks>
@@ -461,8 +524,21 @@ internal sealed class RecommendationEngine(
 
     private sealed record MovieWithGenres(Movie Movie);
 
-    private sealed record ScoredMovie(Movie Movie, ScoredRecommendation Scored);
+    private sealed record ScoredMovie(
+        Movie Movie,
+        ScoredRecommendation Scored,
+        WatchOptions Watch)
+    {
+        public ScoredMovie(Movie movie, ScoredRecommendation scored)
+            : this(movie, scored, WatchOptions.Unknown)
+        {
+        }
+    }
 }
 
 /// <summary>A film to recommend, with why and where it ranked.</summary>
-internal sealed record Recommendation(Movie Movie, ScoredRecommendation Scored, int Rank);
+internal sealed record Recommendation(
+    Movie Movie,
+    ScoredRecommendation Scored,
+    WatchOptions Watch,
+    int Rank);
