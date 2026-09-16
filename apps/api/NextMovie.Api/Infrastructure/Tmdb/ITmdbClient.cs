@@ -53,4 +53,10 @@ internal interface ITmdbClient
         int genreId,
         int minimumVotes,
         CancellationToken cancellationToken);
+
+    /// <summary>Where a film can be watched, by country.</summary>
+    /// <param name="tmdbId">The film.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="TmdbException">TMDb was unreachable or returned a failure.</exception>
+    Task<TmdbWatchProvidersResponse> GetWatchProvidersAsync(int tmdbId, CancellationToken cancellationToken);
 }

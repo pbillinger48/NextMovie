@@ -82,6 +82,15 @@ internal sealed class TmdbClient(HttpClient httpClient, ILogger<TmdbClient> logg
             cancellationToken);
     }
 
+    public Task<TmdbWatchProvidersResponse> GetWatchProvidersAsync(
+        int tmdbId,
+        CancellationToken cancellationToken) =>
+        SendAsync<TmdbWatchProvidersResponse>(
+            $"movie/{tmdbId}/watch/providers",
+            () => new TmdbWatchProvidersResponse(),
+            $"watch providers for film {tmdbId}",
+            cancellationToken);
+
     /// <summary>
     /// Issues a GET and translates every failure mode into <see cref="TmdbException"/>.
     /// </summary>
