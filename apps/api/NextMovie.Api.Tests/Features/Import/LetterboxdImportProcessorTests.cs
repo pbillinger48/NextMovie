@@ -623,6 +623,12 @@ public sealed class LetterboxdImportProcessorTests(PostgresFixture postgres) : I
         public Task<TmdbSearchResponse> GetRelatedMoviesAsync(int tmdbId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("These tests do not ask for related films.");
 
+        public Task<TmdbSearchResponse> DiscoverBestInGenreAsync(
+            int genreId,
+            int minimumVotes,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException("These tests do not discover films.");
+
         public Task<TmdbSearchResponse> SearchMoviesAsync(string title, int page, CancellationToken cancellationToken)
         {
             lock (Searched)

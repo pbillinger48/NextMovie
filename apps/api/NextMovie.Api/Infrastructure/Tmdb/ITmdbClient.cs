@@ -34,4 +34,23 @@ internal interface ITmdbClient
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <exception cref="TmdbException">TMDb was unreachable or returned a failure.</exception>
     Task<TmdbSearchResponse> GetRelatedMoviesAsync(int tmdbId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The best-reviewed films in a genre.
+    /// </summary>
+    /// <remarks>
+    /// The second candidate source. Relatedness answers "what else is like the
+    /// films you loved", which for somebody who has seen eight hundred films
+    /// returns mostly films they have already seen. This answers "what are the
+    /// best films of this kind" — which is the question a recommendation is
+    /// actually for.
+    /// </remarks>
+    /// <param name="genreId">TMDb genre identifier.</param>
+    /// <param name="minimumVotes">Votes a film needs before its rating is believed.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="TmdbException">TMDb was unreachable or returned a failure.</exception>
+    Task<TmdbSearchResponse> DiscoverBestInGenreAsync(
+        int genreId,
+        int minimumVotes,
+        CancellationToken cancellationToken);
 }

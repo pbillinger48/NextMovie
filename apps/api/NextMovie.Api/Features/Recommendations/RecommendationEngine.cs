@@ -3,6 +3,7 @@ using NextMovie.Api.Domain;
 using NextMovie.Api.Domain.Recommendations;
 using NextMovie.Api.Infrastructure.Persistence;
 using NextMovie.Api.Infrastructure.Tmdb;
+using Dtos = NextMovie.Api.Infrastructure.Tmdb.Dtos;
 
 namespace NextMovie.Api.Features.Recommendations;
 
@@ -46,6 +47,16 @@ internal sealed class RecommendationEngine(
     private const double MinimumAppetiteToSeed = 0.3;
 
     /// <summary>
+    /// How many genres are asked for their best films.
+    /// </summary>
+    /// <remarks>
+    /// Each is one TMDb call on the request path, same as a seed. Five covers the
+    /// range of what somebody watches without doubling the time a recommendation
+    /// takes.
+    /// </remarks>
+    private const int DiscoverGenres = 5;
+
+    /// <summary>
     /// The largest share of one response that may come from a single genre.
     /// </summary>
     /// <remarks>
@@ -86,12 +97,14 @@ internal sealed class RecommendationEngine(
             return [];
         }
 
-        var candidates = await CandidatesAsync(seeds, cancellationToken);
+        var candidates = await CandidatesAsync(seeds, profile, cancellationToken);
         var excluded = await SeenFilmsAsync(userId, cancellationToken);
 
         var genreNames = await db.Genres
             .AsNoTracking()
             .ToDictionaryAsync(genre => genre.Id, genre => genre.Name, cancellationToken);
+
+        var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
 
         var pool = candidates
             .Where(film => !excluded.Contains(film.Movie.Id))
@@ -102,10 +115,15 @@ internal sealed class RecommendationEngine(
                     film.Movie.Id,
                     [.. film.Movie.Genres.Select(genre => genre.Id)],
                     film.Movie.Runtime,
-                    film.Movie.ReleaseDate?.Year,
+                    film.Movie.ReleaseDate,
                     film.Movie.AverageRating,
-                    film.Movie.Popularity),
+                    film.Movie.VoteCount),
             })
+
+            // The quality floor, applied before ranking rather than as a penalty
+            // inside it. A penalty can be outvoted by anything else in the score;
+            // this cannot. Returning six good films beats twelve with duds in it.
+            .Where(entry => RecommendationScorer.IsWorthRecommending(entry.Candidate, today))
             .ToList();
 
         // Worked out across the pool, so a genre shared by every candidate stops
@@ -251,30 +269,38 @@ internal sealed class RecommendationEngine(
     /// </remarks>
     private async Task<List<MovieWithGenres>> CandidatesAsync(
         IReadOnlyList<int> seeds,
+        TasteProfile profile,
         CancellationToken cancellationToken)
     {
         var mapped = new Dictionary<int, MappedMovie>();
 
+        // Source one: what TMDb considers related to films this person loved.
         foreach (var seed in seeds)
         {
-            try
-            {
-                var related = await tmdb.GetRelatedMoviesAsync(seed, cancellationToken);
+            await CollectAsync(
+                mapped,
+                () => tmdb.GetRelatedMoviesAsync(seed, cancellationToken),
+                $"films related to {seed}",
+                cancellationToken);
+        }
 
-                foreach (var dto in related.Results.Take(CandidatesPerSeed))
-                {
-                    if (TmdbMovieMapper.ToDomain(dto) is { } candidate)
-                    {
-                        mapped.TryAdd(candidate.Movie.TmdbId, candidate);
-                    }
-                }
-            }
-            catch (TmdbException exception)
-            {
-                // One seed failing costs that seed's candidates, not the whole
-                // recommendation. Four seeds still produce a decent pool.
-                logger.LogWarning(exception, "Could not fetch films related to {TmdbId}", seed);
-            }
+        // Source two: the best-reviewed films in the genres they watch.
+        //
+        // Relatedness alone is not enough for somebody with a large library: it
+        // answers "what is like the films you loved", and for eight hundred films
+        // watched, most of that answer is films they have already seen. One real
+        // library's entire candidate pool contained a single unwatched film rated
+        // above 8. This asks the question a recommendation is actually for.
+        foreach (var genreId in BestGenres(profile))
+        {
+            await CollectAsync(
+                mapped,
+                () => tmdb.DiscoverBestInGenreAsync(
+                    genreId,
+                    RecommendationScorer.MinimumVotes,
+                    cancellationToken),
+                $"best films in genre {genreId}",
+                cancellationToken);
         }
 
         if (mapped.Count == 0)
@@ -285,6 +311,56 @@ internal sealed class RecommendationEngine(
         var stored = await catalog.UpsertAsync([.. mapped.Values], cancellationToken);
 
         return [.. stored.Select(movie => new MovieWithGenres(movie))];
+    }
+
+    /// <summary>
+    /// The genres worth asking TMDb for its best films in.
+    /// </summary>
+    /// <remarks>
+    /// Spread across what this person watches for the same reason the seeds are:
+    /// taking the top few would ask for the best dramas five times over.
+    /// </remarks>
+    private static IEnumerable<int> BestGenres(TasteProfile profile)
+    {
+        var wanted = profile.GenreAffinity
+            .Where(entry => profile.GenreAppetite.GetValueOrDefault(entry.Key) >= MinimumAppetiteToSeed)
+            .OrderByDescending(entry => entry.Value)
+            .Select(entry => entry.Key)
+            .ToList();
+
+        for (var slot = 0; slot < DiscoverGenres && wanted.Count > 0; slot++)
+        {
+            yield return wanted[wanted.Count * slot / DiscoverGenres];
+        }
+    }
+
+    /// <summary>Runs one TMDb query into the candidate pool, tolerating failure.</summary>
+    /// <remarks>
+    /// One query failing costs its candidates, not the recommendation. With two
+    /// sources and several queries each, a pool survives losing some of them.
+    /// </remarks>
+    private async Task CollectAsync(
+        Dictionary<int, MappedMovie> pool,
+        Func<Task<Dtos.TmdbSearchResponse>> query,
+        string description,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await query();
+
+            foreach (var dto in response.Results.Take(CandidatesPerSeed))
+            {
+                if (TmdbMovieMapper.ToDomain(dto) is { } candidate)
+                {
+                    pool.TryAdd(candidate.Movie.TmdbId, candidate);
+                }
+            }
+        }
+        catch (TmdbException exception)
+        {
+            logger.LogWarning(exception, "Could not fetch {Description}", description);
+        }
     }
 
     /// <summary>Everything this person has already seen or judged.</summary>

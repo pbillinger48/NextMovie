@@ -51,6 +51,7 @@ internal static class TmdbMovieMapper
             BackdropPath = Normalize(dto.BackdropPath),
             ReleaseDate = ParseReleaseDate(dto.ReleaseDate),
             AverageRating = ParseRating(dto.VoteAverage, dto.VoteCount),
+            VoteCount = dto.VoteCount,
             Popularity = dto.Popularity,
             Language = Normalize(dto.OriginalLanguage),
 
@@ -97,6 +98,7 @@ internal static class TmdbMovieMapper
             BackdropPath = Normalize(dto.BackdropPath),
             ReleaseDate = ParseReleaseDate(dto.ReleaseDate),
             AverageRating = ParseRating(dto.VoteAverage, dto.VoteCount),
+            VoteCount = dto.VoteCount,
             Popularity = dto.Popularity,
             Language = Normalize(dto.OriginalLanguage),
 

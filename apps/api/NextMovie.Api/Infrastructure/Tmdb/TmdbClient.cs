@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using NextMovie.Api.Infrastructure.Tmdb.Dtos;
@@ -54,6 +55,32 @@ internal sealed class TmdbClient(HttpClient httpClient, ILogger<TmdbClient> logg
             () => new TmdbSearchResponse(),
             $"recommendations for film {tmdbId}",
             cancellationToken);
+
+    public Task<TmdbSearchResponse> DiscoverBestInGenreAsync(
+        int genreId,
+        int minimumVotes,
+        CancellationToken cancellationToken)
+    {
+        // Sorted by rating, with a vote floor applied by TMDb rather than by us:
+        // without it the top of this list is films rated 10.0 by four people.
+        // Already released, sorted by rating, with a vote floor applied by TMDb
+        // rather than by us. Without the vote floor the top of this list is films
+        // rated 10.0 by four people; without the release filter it is films that
+        // are not out yet, rated by the people most excited about them.
+        var releasedBy = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        var requestUri =
+            $"discover/movie?with_genres={genreId}"
+            + $"&sort_by=vote_average.desc&vote_count.gte={minimumVotes}"
+            + $"&primary_release_date.lte={releasedBy}"
+            + "&include_adult=false";
+
+        return SendAsync<TmdbSearchResponse>(
+            requestUri,
+            () => new TmdbSearchResponse(),
+            $"best films in genre {genreId}",
+            cancellationToken);
+    }
 
     /// <summary>
     /// Issues a GET and translates every failure mode into <see cref="TmdbException"/>.

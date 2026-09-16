@@ -26,8 +26,24 @@ public static class RecommendationScorer
     /// Popularity is deliberately the smallest: ranking by it would recommend the
     /// same films to everybody.
     /// </remarks>
-    public const double TasteWeight = 0.35;
-    public const double QualityWeight = 0.15;
+    /// <summary>
+    /// How good the film is, by the wider audience's reckoning.
+    /// </summary>
+    /// <remarks>
+    /// The largest weight, and deliberately so. The purpose is to recommend the
+    /// <b>best</b> films somebody would enjoy, not the most typical ones — and an
+    /// earlier version of this got that backwards, returning films rated 6.0 and
+    /// 6.3 from a catalogue holding a hundred films rated above 8.
+    /// </remarks>
+    public const double QualityWeight = 0.45;
+
+    /// <summary>How much the film is this person's kind of thing.</summary>
+    /// <remarks>
+    /// Smaller than quality, because taste decides <em>among</em> good films
+    /// rather than excusing a mediocre one. A film nobody rates highly is not
+    /// rescued by being in a genre somebody watches a lot of.
+    /// </remarks>
+    public const double TasteWeight = 0.15;
 
     /// <summary>
     /// What a good film in a genre you actually watch is worth, beyond the two
@@ -44,9 +60,55 @@ public static class RecommendationScorer
     /// </remarks>
     public const double InteractionWeight = 0.30;
 
-    public const double RuntimeWeight = 0.07;
-    public const double EraWeight = 0.08;
-    public const double PopularityWeight = 0.05;
+    public const double RuntimeWeight = 0.05;
+    public const double EraWeight = 0.05;
+
+    /// <summary>
+    /// The rating below which a film is not recommended at all.
+    /// </summary>
+    /// <remarks>
+    /// A floor rather than a penalty. Weights let a bad film win on other
+    /// grounds — being the right length, or filling a thin genre slot in a
+    /// diversified list — and no weighting survives that. Returning six good
+    /// films beats returning twelve with three duds in it.
+    /// </remarks>
+    public const double MinimumRating = 6.5;
+
+    /// <summary>
+    /// The votes a rating needs before it is believed.
+    /// </summary>
+    /// <remarks>
+    /// Nine out of ten from a dozen people is not evidence of anything, and the
+    /// bar has to be well clear of that. Two failures set it here. A
+    /// direct-to-video children's film reached a list at 7.5 from 205 votes,
+    /// rated by exactly the audience that sought it out. Then films released
+    /// weeks earlier arrived at 9.1 from a thousand votes, carrying the ratings
+    /// of the people most excited to see them — reputations that had not yet
+    /// settled.
+    /// <para>
+    /// Five thousand is where the classics sit comfortably (Psycho has eleven
+    /// thousand, City of God eight) and hype has not yet reached. It excludes some
+    /// genuinely good films with smaller audiences, which is the deliberate cost
+    /// of asking for the best rather than the most agreeable.
+    /// </para>
+    /// <para>
+    /// Films whose vote count we have not yet fetched are judged on rating alone
+    /// rather than excluded, since the alternative is excluding most of the
+    /// catalogue.
+    /// </para>
+    /// </remarks>
+    public const int MinimumVotes = 5_000;
+
+    /// <summary>
+    /// The rating at which a film stops being merely watchable.
+    /// </summary>
+    /// <remarks>
+    /// Quality is measured across the range that actually separates films worth
+    /// recommending — roughly 6.5 to 8.5 — rather than across 0 to 10, where a
+    /// point of difference between a great film and a poor one shrinks to a tenth
+    /// of the scale and stops mattering.
+    /// </remarks>
+    private const double ExcellentRating = 8.5;
 
     /// <summary>
     /// The affinity above which a genre is worth naming as a reason.
@@ -80,15 +142,13 @@ public static class RecommendationScorer
         var quality = CommunityScore(candidate);
         var runtime = RangeScore(candidate.Runtime, profile.PreferredRuntimes, tolerance: 30);
         var era = RangeScore(candidate.ReleaseYear, profile.PreferredEra, tolerance: 15);
-        var popularity = PopularityScore(candidate);
 
         var score =
             (taste * TasteWeight)
             + (quality * QualityWeight)
             + (taste * quality * InteractionWeight)
             + (runtime * RuntimeWeight)
-            + (era * EraWeight)
-            + (popularity * PopularityWeight);
+            + (era * EraWeight);
 
         return new ScoredRecommendation(
             candidate.MovieId,
@@ -179,10 +239,41 @@ public static class RecommendationScorer
             entry => Math.Max(0.1, Math.Log((double)pool.Count / entry.Value) + 0.1));
     }
 
+    /// <summary>
+    /// How good the film is, across the range that actually separates them.
+    /// </summary>
+    /// <remarks>
+    /// Stretched over <see cref="MinimumRating"/> to <see cref="ExcellentRating"/>
+    /// rather than 0–10. On the raw scale the difference between a 6.5 and an 8.5
+    /// is a fifth of the range and loses to almost anything else; here it is the
+    /// whole range, which is what makes quality decide.
+    /// </remarks>
     private static double CommunityScore(RecommendationCandidate candidate) =>
-        // Unrated films sit slightly below the middle: absence of a community
-        // verdict is weak evidence of obscurity, not of quality.
-        candidate.CommunityRating is { } rating ? Math.Clamp(rating / 10.0, 0, 1) : 0.4;
+        candidate.CommunityRating is { } rating
+            ? Math.Clamp((rating - MinimumRating) / (ExcellentRating - MinimumRating), 0, 1)
+
+            // No community verdict at all. Not zero, but well below anything with
+            // a real reputation.
+            : 0.2;
+
+    /// <summary>
+    /// Whether a film is good enough to be worth anybody's evening.
+    /// </summary>
+    /// <remarks>
+    /// Applied before ranking rather than as a penalty within it, because a
+    /// penalty can always be outvoted. Films with too few votes are refused for
+    /// the same reason: their rating is not yet a fact about the film.
+    /// </remarks>
+    public static bool IsWorthRecommending(RecommendationCandidate candidate, DateOnly today) =>
+        candidate.CommunityRating >= MinimumRating
+        && candidate.VoteCount is null or >= MinimumVotes
+
+        // Out already. A film nobody can watch is not a recommendation, and
+        // unreleased films carry the most flattering ratings on TMDb — scored by
+        // the people most excited about them, before anyone has been
+        // disappointed.
+        && candidate.ReleaseDate is { } released
+        && released <= today;
 
     /// <summary>
     /// How near a value falls to a preferred range, fading out beyond it.
@@ -211,20 +302,6 @@ public static class RecommendationScorer
     }
 
     /// <summary>
-    /// Popularity, compressed hard.
-    /// </summary>
-    /// <remarks>
-    /// TMDb popularity is unbounded and extremely skewed — a blockbuster can be
-    /// a thousand times a quiet film's number. Taken raw it would swamp every
-    /// other signal, so it is log-scaled: the difference between obscure and
-    /// known matters, the difference between famous and enormous barely does.
-    /// </remarks>
-    private static double PopularityScore(RecommendationCandidate candidate) =>
-        candidate.Popularity is { } popularity and > 0
-            ? Math.Clamp(Math.Log10(popularity + 1) / 3.0, 0, 1)
-            : 0.3;
-
-    /// <summary>
     /// The reasons that actually moved this recommendation.
     /// </summary>
     /// <remarks>
@@ -241,6 +318,16 @@ public static class RecommendationScorer
         double eraScore)
     {
         var reasons = new List<string>();
+
+        // Quality leads, because it is now what mostly decides the ranking. A
+        // reason list that opened with a genre while an 8.6 rating did the work
+        // would be explaining the wrong thing.
+        if (candidate.CommunityRating is { } rating and >= 7.5)
+        {
+            reasons.Add(rating >= 8.0
+                ? $"Widely considered excellent — {rating:0.0} on TMDb"
+                : $"Well regarded — {rating:0.0} on TMDb");
+        }
 
         var strongGenres = candidate.GenreIds
             .Where(genreId => profile.AffinityFor(genreId) >= NotableAffinity)
@@ -266,11 +353,6 @@ public static class RecommendationScorer
         if (eraScore >= 1.0 && candidate.ReleaseYear is { } year)
         {
             reasons.Add($"From {year}, in the period you watch most");
-        }
-
-        if (candidate.CommunityRating is >= 7.5)
-        {
-            reasons.Add($"Rated {candidate.CommunityRating:0.0} by the wider audience");
         }
 
         return reasons;
@@ -309,16 +391,20 @@ public static class RecommendationScorer
 /// <param name="MovieId">NextMovie identifier.</param>
 /// <param name="GenreIds">TMDb genre identifiers.</param>
 /// <param name="Runtime">Minutes, when known.</param>
-/// <param name="ReleaseYear">Year, when known.</param>
+/// <param name="ReleaseDate">When it came out, when known. Null means unreleased or unknown, and is not recommendable.</param>
 /// <param name="CommunityRating">TMDb community rating 0–10, when the film has votes.</param>
-/// <param name="Popularity">TMDb popularity. Unbounded and heavily skewed.</param>
+/// <param name="VoteCount">How many people rated it, when known. Decides whether the rating is believed.</param>
 public sealed record RecommendationCandidate(
     Guid MovieId,
     IReadOnlyList<int> GenreIds,
     int? Runtime,
-    int? ReleaseYear,
+    DateOnly? ReleaseDate,
     double? CommunityRating,
-    double? Popularity);
+    int? VoteCount)
+{
+    /// <summary>The year it came out, for comparing against what someone watches.</summary>
+    public int? ReleaseYear => ReleaseDate?.Year;
+}
 
 /// <summary>A scored candidate, with the reasons behind the score.</summary>
 /// <param name="MovieId">The film.</param>

@@ -83,6 +83,7 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
         // product wearing this one's clothes.
         Assert.Empty(body.Recommendations);
         Assert.Equal(0, _tmdb.RelatedCalls);
+        Assert.Equal(0, _tmdb.DiscoverCalls);
     }
 
     [Fact]
@@ -94,6 +95,10 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
 
         Assert.NotEmpty(body.Recommendations);
         Assert.Equal(1, _tmdb.RelatedCalls);
+
+        // The second source: the best films in the genres they watch, which is
+        // where great unseen films come from for somebody with a large library.
+        Assert.True(_tmdb.DiscoverCalls > 0);
 
         var top = body.Recommendations[0];
         Assert.Equal(1, top.Rank);
@@ -183,6 +188,56 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
         var body = await ReadAsync(client, "?count=500");
 
         Assert.True(body.Recommendations.Count <= 30);
+    }
+
+    [Fact]
+    public async Task A_poorly_rated_film_is_never_recommended()
+    {
+        var (client, _) = await SignedInWithHistoryAsync();
+
+        // TMDb offers something weak among the related films. It must not appear
+        // however well its genres line up.
+        _tmdb.Related[27205] =
+        [
+            .. _tmdb.Related[27205],
+            new TmdbMovieDto
+            {
+                Id = 999_001,
+                Title = "Direct To Video",
+                ReleaseDate = "2016-01-01",
+                VoteAverage = 5.4,
+                VoteCount = 4_000,
+                GenreIds = [SciFiGenre],
+            },
+        ];
+
+        var body = await ReadAsync(client);
+
+        Assert.DoesNotContain(body.Recommendations, film => film.Title == "Direct To Video");
+    }
+
+    [Fact]
+    public async Task A_high_rating_from_too_few_people_is_never_recommended()
+    {
+        var (client, _) = await SignedInWithHistoryAsync();
+
+        _tmdb.Related[27205] =
+        [
+            .. _tmdb.Related[27205],
+            new TmdbMovieDto
+            {
+                Id = 999_002,
+                Title = "Beloved By Its Twelve Fans",
+                ReleaseDate = "2016-01-01",
+                VoteAverage = 9.4,
+                VoteCount = 12,
+                GenreIds = [SciFiGenre],
+            },
+        ];
+
+        var body = await ReadAsync(client);
+
+        Assert.DoesNotContain(body.Recommendations, film => film.Title == "Beloved By Its Twelve Fans");
     }
 
     [Fact]
@@ -308,6 +363,33 @@ public sealed class RecommendationEndpointTests(PostgresFixture postgres) : IAsy
             }
 
             var results = Related.TryGetValue(tmdbId, out var films) ? films : [];
+
+            return Task.FromResult(new TmdbSearchResponse
+            {
+                Page = 1,
+                TotalPages = 1,
+                TotalResults = results.Length,
+                Results = results,
+            });
+        }
+
+        public Dictionary<int, TmdbMovieDto[]> BestInGenre { get; } = [];
+
+        public int DiscoverCalls { get; private set; }
+
+        public Task<TmdbSearchResponse> DiscoverBestInGenreAsync(
+            int genreId,
+            int minimumVotes,
+            CancellationToken cancellationToken)
+        {
+            DiscoverCalls++;
+
+            if (Failure is not null)
+            {
+                return Task.FromException<TmdbSearchResponse>(Failure);
+            }
+
+            var results = BestInGenre.TryGetValue(genreId, out var films) ? films : [];
 
             return Task.FromResult(new TmdbSearchResponse
             {

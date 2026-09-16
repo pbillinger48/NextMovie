@@ -51,6 +51,17 @@ public class Movie
     /// <summary>TMDb community rating, 0–10. Not a NextMovie user rating.</summary>
     public double? AverageRating { get; set; }
 
+    /// <summary>
+    /// How many people have rated it on TMDb.
+    /// </summary>
+    /// <remarks>
+    /// Without this a rating cannot be trusted: 9.0 from twelve people and 9.0
+    /// from twelve thousand are the same number and completely different claims.
+    /// Recommendations use it to refuse films whose reputation is not yet
+    /// established.
+    /// </remarks>
+    public int? VoteCount { get; set; }
+
     /// <summary>TMDb popularity score. Relative and unbounded; only meaningful compared against other films.</summary>
     public double? Popularity { get; set; }
 
