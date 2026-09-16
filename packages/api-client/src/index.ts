@@ -29,6 +29,7 @@ export type CountryOption = components["schemas"]["CountryOption"];
 export type MovieResponseState = components["schemas"]["MovieResponseState"];
 export type WatchlistResponse = components["schemas"]["WatchlistResponse"];
 export type SavedFilm = components["schemas"]["SavedFilm"];
+export type WatchingOptions = components["schemas"]["WatchingOptions"];
 
 export type { paths };
 

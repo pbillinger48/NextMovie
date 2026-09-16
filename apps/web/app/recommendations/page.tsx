@@ -3,6 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { ResponseButtons } from "@/app/components/ResponseButtons";
+import { WatchOptions } from "@/app/components/WatchOptions";
 import { getRecommendations, type RecommendedFilm } from "@/lib/recommendations-api";
 import { formatRuntime } from "@/lib/format";
 import { getSession } from "@/lib/server-session";
@@ -40,19 +42,25 @@ export default async function RecommendationsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">What to watch</h1>
         <p className="max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
           Films you haven&apos;t seen, chosen from what you watch and rate. Each one
-          says why it is here.
+          says why it is here, and where you can watch it. Save what appeals and
+          hide what doesn&apos;t — both stop it coming back.
         </p>
       </div>
 
       {result.films.length === 0 ? <NothingYet /> : <Films films={result.films} />}
 
       {/*
-        ADR-0008 keeps streaming availability out of the first version, so the
-        page says so rather than letting the omission read as an oversight.
+        Availability comes from TMDb, whose provider data is not exhaustive
+        (ADR-0010). Saying so once at the foot of the page is more honest than
+        letting a silent gap read as "nowhere".
       */}
       <p className="max-w-prose border-t border-neutral-200 pt-4 text-xs text-neutral-500 dark:border-neutral-800">
-        NextMovie cannot yet tell you where to stream these. That is coming; until
-        then these are what to watch, not where.
+        Where to watch comes from TMDb and is not exhaustive — smaller services are
+        patchy, and it can be a day out of date. Set{" "}
+        <Link href="/profile/streaming" className="underline underline-offset-2">
+          your region and services
+        </Link>{" "}
+        to see what you can start tonight.
       </p>
     </div>
   );
@@ -74,26 +82,36 @@ function Film({ film }: { film: RecommendedFilm }) {
   const year = film.releaseDate?.slice(0, 4);
 
   return (
-    <Link
-      href={`/movies/${film.movieId}`}
-      className="group flex gap-4 rounded-lg border border-neutral-200 p-3 hover:border-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-neutral-800"
-    >
-      <div className="relative aspect-[2/3] w-20 shrink-0 overflow-hidden rounded bg-neutral-200 sm:w-24 dark:bg-neutral-800">
+    // Not a link wrapping the whole card any more. The card now holds buttons,
+    // and a button inside an anchor is invalid HTML that navigates when pressed.
+    // The title is the link instead, which is also what a screen reader would
+    // rather announce than the entire row.
+    <div className="flex gap-4 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+      <Link
+        href={`/movies/${film.movieId}`}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="relative aspect-[2/3] w-20 shrink-0 overflow-hidden rounded bg-neutral-200 sm:w-24 dark:bg-neutral-800"
+      >
         {film.posterPath ? (
           <Image
             src={`${POSTER_BASE_URL}${film.posterPath}`}
             alt=""
-            aria-hidden="true"
             fill
             sizes="6rem"
             className="object-cover"
           />
         ) : null}
-      </div>
+      </Link>
 
-      <div className="flex flex-col gap-1.5">
-        <h2 className="leading-snug font-medium group-hover:underline underline-offset-2">
-          {film.title}
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <h2 className="leading-snug font-medium">
+          <Link
+            href={`/movies/${film.movieId}`}
+            className="hover:underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            {film.title}
+          </Link>
         </h2>
 
         <p className="text-xs text-neutral-600 dark:text-neutral-400">
@@ -106,6 +124,8 @@ function Film({ film }: { film: RecommendedFilm }) {
             .filter(Boolean)
             .join(" · ")}
         </p>
+
+        <WatchOptions watch={film.watch} />
 
         {film.reasons.length > 0 ? (
           <ul className="flex flex-col gap-0.5 text-xs text-neutral-700 dark:text-neutral-300">
@@ -126,8 +146,17 @@ function Film({ film }: { film: RecommendedFilm }) {
               : "A reasonable guess, from limited history"}
           </p>
         ) : null}
+
+        <div className="pt-1">
+          {/*
+            Recommendations only ever contain films with no standing answer —
+            answering one removes it from the list (ADR-0011) — so the buttons
+            start from the neutral state every time.
+          */}
+          <ResponseButtons movieId={film.movieId} response={null} watched={false} />
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
