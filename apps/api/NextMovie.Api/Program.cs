@@ -20,6 +20,7 @@ using NextMovie.Api.Infrastructure.ErrorHandling;
 using NextMovie.Api.Infrastructure.Letterboxd;
 using NextMovie.Api.Infrastructure.OpenApi;
 using NextMovie.Api.Infrastructure.Persistence;
+using NextMovie.Api.Infrastructure.Startup;
 using NextMovie.Api.Domain.Streaming;
 using NextMovie.Api.Infrastructure.Tmdb;
 
@@ -49,23 +50,12 @@ else
     builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 }
 
-// PostgreSQL via EF Core. Snake-case naming keeps identifiers in PostgreSQL's
-// native style (movies.tmdb_id), so hand-written SQL and psql sessions never
-// need to quote them. Migrations are never applied automatically — see the
-// README; running DDL from application startup races across instances on deploy.
-builder.Services.AddDbContext<NextMovieDbContext>(options => options
-    .UseNpgsql(builder.Configuration.GetConnectionString("NextMovieDb"))
-    .UseSnakeCaseNamingConvention());
+// The engine, its data access and its TMDb client, registered in one place so
+// the offline evaluator (ADR-0012) measures exactly what ships rather than a
+// hand-wired approximation of it.
+builder.Services.AddRecommendationEngine(builder.Configuration, validateOnStart: !isSchemaGeneration);
 
-builder.Services.AddScoped<MovieCatalog>();
 builder.Services.AddScoped<UserLibrary>();
-builder.Services.AddScoped<RecommendationEngine>();
-
-// Availability sits behind an interface because it is the piece most likely to be
-// replaced: TMDb's data is free and adequate, but it cannot say when a film
-// leaves a service and does not link to the film on it (ADR-0010).
-builder.Services.AddScoped<IAvailabilityProvider, TmdbAvailabilityProvider>();
-builder.Services.AddScoped<AvailabilityCatalog>();
 builder.Services.AddScoped<IServiceDirectory, TmdbServiceDirectory>();
 builder.Services.AddScoped<ServiceCatalog>();
 builder.Services.AddScoped<LetterboxdCsvReader>();
@@ -79,14 +69,10 @@ if (!isSchemaGeneration)
     builder.Services.AddHostedService<ImportWorker>();
 }
 
-// Bound and validated at startup rather than on first use: a missing TMDb token
-// or signing key should stop the process immediately with a clear message, not
-// surface as a confusing 401 the first time somebody searches or signs in.
-var tmdbOptions = builder.Services
-    .AddOptions<TmdbOptions>()
-    .Bind(builder.Configuration.GetSection(TmdbOptions.SectionName))
-    .ValidateDataAnnotations();
-
+// Bound and validated at startup rather than on first use: a missing signing key
+// should stop the process immediately with a clear message, not surface as a
+// confusing 401 the first time somebody signs in. TMDb's own options are bound
+// alongside its client in AddRecommendationEngine.
 var jwtOptions = builder.Services
     .AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
@@ -108,7 +94,6 @@ var googleOptions = builder.Services
 // that actually serves traffic still validates.
 if (!isSchemaGeneration)
 {
-    tmdbOptions.ValidateOnStart();
     jwtOptions.ValidateOnStart();
     googleOptions.ValidateOnStart();
 }
@@ -139,20 +124,6 @@ builder.Services.AddScoped<SessionRevoker>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.ConfigureOptions<ConfigureJwtBearerOptions>();
 builder.Services.AddAuthorization();
-
-builder.Services.AddHttpClient<ITmdbClient, TmdbClient>((serviceProvider, client) =>
-    {
-        var options = serviceProvider.GetRequiredService<IOptions<TmdbOptions>>().Value;
-
-        client.BaseAddress = new Uri(options.BaseUrl);
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", options.ApiReadAccessToken);
-        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-    })
-    // Timeout, retry with exponential backoff and jitter, and a circuit breaker.
-    // The breaker matters most: without it, a TMDb outage means every request
-    // retries into an already-failing service and we amplify their incident.
-    .AddStandardResilienceHandler();
 
 // RFC 7807 ProblemDetails for every error response, matching the error format
 // documented in docs/api.md.

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Common properties live in ../Directory.Build.props -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+
+    <!--
+      The same secrets store as the API. The evaluator runs the real engine
+      against the real database and the real TMDb (ADR-0012), so it needs exactly
+      the credentials the API already has — and copying them into a second store
+      is how one of the two ends up stale.
+    -->
+    <UserSecretsId>be5af9c8-ec18-48b3-897e-e06a7332b1c8</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NextMovie.Api/NextMovie.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The API's own settings, linked rather than copied. The connection string
+      lives in one file; a second copy here would be correct until the day
+      somebody changed the port in only one of them.
+    -->
+    <Content Include="../NextMovie.Api/appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../NextMovie.Api/appsettings.Development.json" Link="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.11" />
+  </ItemGroup>
+
+</Project>
