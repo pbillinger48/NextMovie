@@ -230,12 +230,43 @@ pnpm generate                          # rewrites the TypeScript types
 CI runs both and **fails if the committed output differs** — which is what makes
 this a guarantee rather than a habit.
 
+## Evaluating recommendations
+
+Per [ADR-0012](docs/adr/0012-offline-recommendation-evaluation.md), recommendation
+quality is measured rather than eyeballed. The evaluator hides a seeded fraction
+of the films you rated highly, runs the **real** engine against what is left, and
+reports whether they came back.
+
+```bash
+dotnet run --project apps/api/NextMovie.Eval -- --email you@example.com
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--email` | *required* | Whose library to evaluate |
+| `--holdout` | `0.2` | Share of favourites to hide |
+| `--count` | `12` | Recommendations to request |
+| `--trials` | `5` | Splits to run and average |
+| `--seed` | `1` | Fixes the splits |
+| `--loved` | `4.5` | Rating that counts as a favourite |
+
+It needs a populated database and a working TMDb token — it reads both from the
+API's own configuration, so if the API runs, this runs.
+
+**Every trial is a transaction that is always rolled back.** Hiding films means
+deleting rows and the engine writes an impression for everything it serves;
+neither may survive a run.
+
+**Compare runs at the same seed.** A single recall figure means little on its own,
+and it is a *lower bound* rather than accuracy — most good recommendations are
+films you never rated and are invisible to it.
+
 ## Repository layout
 
 ```
 apps/
   web/          Next.js web application
-  api/          ASP.NET Core API
+  api/          ASP.NET Core API, its tests, and the offline evaluator
   mobile/       Expo app (planned)
 packages/
   api-client/   OpenAPI document + generated TypeScript client

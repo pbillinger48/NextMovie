@@ -24,6 +24,13 @@
       need to reach them, which is exactly what this is for.
     -->
     <InternalsVisibleTo Include="NextMovie.Api.Tests" />
+
+    <!--
+      The offline evaluator drives the real engine and the real catalogs, both of
+      which are internal. It measures what ships; reaching it through a public
+      facade built only for evaluation would mean measuring the facade.
+    -->
+    <InternalsVisibleTo Include="NextMovie.Eval" />
   </ItemGroup>
 
   <ItemGroup>
