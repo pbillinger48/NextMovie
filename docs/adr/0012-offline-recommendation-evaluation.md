@@ -107,6 +107,36 @@ not be the one part of this with nothing checking it.
 - Rolling back the transaction discards cached availability fetched during the
   run, so repeated runs re-fetch it.
 
+## Amendment, 2026-09-22: a second mode
+
+The first run of this harness reported recall 10.3% with **MRR 1.000** — in every
+trial, the top recommendation was a held-out favourite. That is consistent with a
+recommender that reads taste well, and equally consistent with one that returns
+the canon to everybody, since most people have seen the canon. **Hold-out cannot
+tell those apart**, and the ADR above predicted exactly that bias without
+providing a way to resolve it.
+
+So the harness gained a second mode. It builds readers with deliberately
+contrasting tastes — each from one genre's worth of real loved films — asks the
+engine what each should watch, and measures two things:
+
+- **Overlap**, pairwise Jaccard across the lists. *A high number is bad.* Reported
+  for the whole list and for the opening slots separately, because a list whose
+  tail diverges and whose head does not is personalised where nobody looks.
+- **On taste**, the share of each list carrying the genre its reader was built
+  from. Overlap can only say two lists *differ*; this asks whether a list is
+  *about* the reader it was made for. Two lists can be completely distinct and
+  both wrong.
+
+The second measure exists because the first was not enough. Overlap came back at
+0.25 — the lists genuinely differ — while a reader built from nothing but musicals
+was offered **no musicals at all**. Distinctness is not relevance, and only
+reading the actual titles made that visible.
+
+**Unlike hold-out, this mode is not reproducible to the decimal.** Candidates are
+fetched live and the run is rolled back, so nothing is cached between runs and
+the figures move by a few points. Read it for its magnitude, not its precision.
+
 ## Alternatives considered
 
 **Online A/B testing**

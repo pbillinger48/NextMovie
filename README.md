@@ -261,6 +261,30 @@ neither may survive a run.
 and it is a *lower bound* rather than accuracy — most good recommendations are
 films you never rated and are invisible to it.
 
+### Is it reading taste, or reciting the canon?
+
+Recall cannot tell those apart — most people have seen the canon, so returning it
+scores well either way. The second mode builds readers with contrasting tastes and
+compares what each is offered:
+
+```bash
+dotnet run --project apps/api/NextMovie.Eval -- \
+  --email you@example.com --mode personalisation \
+  --tastes "Animation,Horror,War,Romance,Western,Music"
+```
+
+- **overlap** — how alike the lists are. **A high number is bad.** Reported for the
+  whole list and for the opening slots separately.
+- **on taste** — how many films carry the genre their reader was built from.
+  Overlap only says lists *differ*; this says whether a list is *about* its reader.
+
+Without `--tastes` it takes the largest genres, which is the *weakest* version of
+the test — the biggest genres share the most films with each other.
+
+This mode is **not** reproducible to the decimal: candidates are fetched live and
+the run is rolled back, so nothing is cached and the figures move a few points
+between runs.
+
 ## Repository layout
 
 ```
