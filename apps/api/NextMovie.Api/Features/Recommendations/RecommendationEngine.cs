@@ -38,25 +38,9 @@ internal sealed class RecommendationEngine(
     /// <summary>Films to consider from each seed.</summary>
     private const int CandidatesPerSeed = 20;
 
-    /// <summary>
-    /// How much of a genre someone must watch before it is worth seeding from.
-    /// </summary>
-    /// <remarks>
-    /// Low, because the point is to span their range rather than to be selective
-    /// — but not zero, or a genre they have seen once would spend one of five
-    /// requests on a guess.
-    /// </remarks>
-    private const double MinimumAppetiteToSeed = 0.3;
 
-    /// <summary>
-    /// How many genres are asked for their best films.
-    /// </summary>
-    /// <remarks>
-    /// Each is one TMDb call on the request path, same as a seed. Five covers the
-    /// range of what somebody watches without doubling the time a recommendation
-    /// takes.
-    /// </remarks>
-    private const int DiscoverGenres = 5;
+
+
 
     /// <summary>
     /// The largest share of one response that may come from a single genre.
@@ -235,20 +219,11 @@ internal sealed class RecommendationEngine(
         // Genres they actually watch, best-liked first. Ones they have barely
         // touched are left out: a seed from a genre seen twice would spend a
         // request on a guess.
-        var wanted = profile.GenreAffinity
-            .Where(entry => profile.GenreAppetite.GetValueOrDefault(entry.Key) >= MinimumAppetiteToSeed)
-            .OrderByDescending(entry => entry.Value)
-            .Select(entry => entry.Key)
-            .ToList();
-
         var seeds = new List<int>();
 
-        for (var slot = 0; slot < SeedFilms && wanted.Count > 0; slot++)
+        // The same spread discovery uses, so the two cannot drift apart.
+        foreach (var genreId in GenreSelection.Spread(GenreSelection.Watched(profile), SeedFilms))
         {
-            // Evenly spaced through the list rather than taken from the front, so
-            // the seeds span what they watch instead of clustering.
-            var genreId = wanted[wanted.Count * slot / SeedFilms];
-
             var best = loved.FirstOrDefault(film =>
                 film.GenreIds.Contains(genreId) && !seeds.Contains(film.TmdbId));
 
@@ -305,7 +280,7 @@ internal sealed class RecommendationEngine(
         // watched, most of that answer is films they have already seen. One real
         // library's entire candidate pool contained a single unwatched film rated
         // above 8. This asks the question a recommendation is actually for.
-        foreach (var genreId in BestGenres(profile))
+        foreach (var genreId in GenreSelection.ForDiscovery(profile))
         {
             await CollectAsync(
                 mapped,
@@ -327,26 +302,6 @@ internal sealed class RecommendationEngine(
         return [.. stored.Select(movie => new MovieWithGenres(movie))];
     }
 
-    /// <summary>
-    /// The genres worth asking TMDb for its best films in.
-    /// </summary>
-    /// <remarks>
-    /// Spread across what this person watches for the same reason the seeds are:
-    /// taking the top few would ask for the best dramas five times over.
-    /// </remarks>
-    private static IEnumerable<int> BestGenres(TasteProfile profile)
-    {
-        var wanted = profile.GenreAffinity
-            .Where(entry => profile.GenreAppetite.GetValueOrDefault(entry.Key) >= MinimumAppetiteToSeed)
-            .OrderByDescending(entry => entry.Value)
-            .Select(entry => entry.Key)
-            .ToList();
-
-        for (var slot = 0; slot < DiscoverGenres && wanted.Count > 0; slot++)
-        {
-            yield return wanted[wanted.Count * slot / DiscoverGenres];
-        }
-    }
 
     /// <summary>Runs one TMDb query into the candidate pool, tolerating failure.</summary>
     /// <remarks>
