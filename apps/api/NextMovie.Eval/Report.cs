@@ -73,6 +73,105 @@ internal static class Report
         return text.ToString();
     }
 
+    /// <summary>Prints a personalisation check.</summary>
+    /// <remarks>
+    /// The verdict bands are judgement, not science, and are labelled as such
+    /// where they print. A coefficient with no reading attached gets read as
+    /// whatever the reader already believed.
+    /// </remarks>
+    public static string Render(EvaluationOptions options, PersonalisationReport report)
+    {
+        var text = new StringBuilder();
+        var overlap = report.Overlap;
+
+        text.AppendLine();
+        text.AppendLine("  PERSONALISATION CHECK");
+        text.AppendLine("  ─────────────────────────────────────────────────────────────");
+        text.AppendLine(Line("cohorts", $"{overlap.Cohorts} contrasting tastes × {options.Count} films"));
+        text.AppendLine(Line("took", $"{report.Elapsed.TotalSeconds:0.0}s"));
+        text.AppendLine();
+
+        text.AppendLine("  HOW ALIKE THE ANSWERS ARE");
+        text.AppendLine(Line("whole list", $"{overlap.MeanPairwise:0.00}  {Verdict(overlap.MeanPairwise)}"));
+        text.AppendLine(Line($"top {report.HeadSize}", $"{report.Head.MeanPairwise:0.00}  {Verdict(report.Head.MeanPairwise)}"));
+        text.AppendLine(Line("in every list", overlap.ListSize > 0
+            ? $"{overlap.Universal.Count} of {overlap.ListSize}"
+            : overlap.Universal.Count.ToString(CultureInfo.InvariantCulture)));
+
+        if (report.Head.MeanPairwise > overlap.MeanPairwise + 0.1)
+        {
+            // Worth saying outright. The two numbers side by side are easy to
+            // read past, and the gap between them is the finding.
+            text.AppendLine();
+            text.AppendLine($"   ⚠ The opening slots agree more than the lists do. Tastes are being");
+            text.AppendLine($"     read in the tail, where nobody looks, and not at the top.");
+        }
+
+        text.AppendLine();
+
+        text.AppendLine("  BY TASTE");
+
+        foreach (var cohort in report.Cohorts)
+        {
+            text.AppendLine(
+                $"   {Truncate(cohort.Taste, 16),-16} from {cohort.Library,3} films   "
+                + $"{cohort.OnTaste,2}/{cohort.Films.Count,-2} on taste   "
+                + $"{cohort.SharedWithOthers,2}/{cohort.Films.Count,-2} shared");
+
+            // The top few by name, because a coefficient cannot be sanity-checked
+            // and a list of films can. Every real fault in this project was found
+            // by reading output, not by reading a number.
+            text.AppendLine($"     {string.Join("  ·  ", cohort.Titles.Take(3).Select(title => Truncate(title, 24)))}");
+        }
+
+        if (report.UniversalTitles.Count > 0)
+        {
+            text.AppendLine();
+            text.AppendLine("  OFFERED TO EVERY TASTE");
+
+            foreach (var title in report.UniversalTitles)
+            {
+                text.AppendLine($"   · {Truncate(title, 56)}");
+            }
+        }
+
+        var onTaste = report.Cohorts.Sum(cohort => cohort.OnTaste);
+        var offered = report.Cohorts.Sum(cohort => cohort.Films.Count);
+
+        text.AppendLine();
+        text.AppendLine(Line("on taste", offered == 0
+            ? "—"
+            : $"{onTaste} of {offered}  ({(double)onTaste / offered * 100:0}% carry the genre asked for)"));
+
+        text.AppendLine();
+        text.AppendLine("  ─────────────────────────────────────────────────────────────");
+        text.AppendLine("  Two lists can differ completely and both be wrong for their reader,");
+        text.AppendLine("  so 'on taste' matters as much as overlap: it asks whether a list is");
+        text.AppendLine("  ABOUT the person it was made for.");
+        text.AppendLine();
+        text.AppendLine("  A HIGH overlap is BAD. These readers were built from deliberately");
+        text.AppendLine("  different films, so films they are all offered are films chosen");
+        text.AppendLine("  without reference to them. Genres share films, so some overlap is");
+        text.AppendLine("  honest — a crime fan and a drama fan really do want some of the");
+        text.AppendLine("  same things. The bands above are judgement, not science.");
+        text.AppendLine();
+
+        return text.ToString();
+    }
+
+    /// <remarks>
+    /// Thresholds chosen to be legible rather than derived — there is no
+    /// principled cut-off, and pretending otherwise would dress a guess as a
+    /// measurement. They exist so a number nobody has a feel for still says
+    /// something on first reading.
+    /// </remarks>
+    private static string Verdict(double overlap) => overlap switch
+    {
+        >= 0.6 => "← these are essentially the same list",
+        >= 0.3 => "← partly personalised",
+        _ => "← the lists genuinely differ",
+    };
+
     private static string Line(string label, string value) => $"  {label,-16} {value}";
 
     private static string Percent(double share) =>

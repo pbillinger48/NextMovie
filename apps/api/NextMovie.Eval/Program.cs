@@ -81,6 +81,7 @@ builder.Logging.AddFilter("System", LogLevel.Warning);
 builder.Services.AddRecommendationEngine(builder.Configuration);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<Evaluator>();
+builder.Services.AddScoped<PersonalisationCheck>();
 
 using var host = builder.Build();
 
@@ -94,8 +95,23 @@ Console.CancelKeyPress += (_, eventArgs) =>
 };
 
 await using var scope = host.Services.CreateAsyncScope();
-var evaluator = scope.ServiceProvider.GetRequiredService<Evaluator>();
 
+if (options.Mode == EvaluationMode.Personalisation)
+{
+    var check = scope.ServiceProvider.GetRequiredService<PersonalisationCheck>();
+    var comparison = await check.RunAsync(options, cancellation.Token);
+
+    if (comparison is null)
+    {
+        return 1;
+    }
+
+    Console.WriteLine(Report.Render(options, comparison));
+
+    return 0;
+}
+
+var evaluator = scope.ServiceProvider.GetRequiredService<Evaluator>();
 var report = await evaluator.RunAsync(options, cancellation.Token);
 
 if (report is null)
