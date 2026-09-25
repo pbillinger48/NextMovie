@@ -399,4 +399,87 @@ public sealed class RecommendationScorerTests
         Assert.Equal(RecommendationScorer.QualityWeight, breakdown.WeightedQuality, precision: 9);
         Assert.Equal(RecommendationScorer.InteractionWeight, breakdown.WeightedInteraction, precision: 9);
     }
+
+    // --- the quality scale, and the floor it is not ---
+
+    [Fact]
+    public void A_loved_genre_beats_a_slightly_better_film_outside_it()
+    {
+        var profile = SciFiFan();
+
+        // The exact race offline evaluation found being lost: 7.95 in the genre
+        // this person seeks out, against 8.39 in the one they avoid. Quality is
+        // still the largest single weight — it just no longer settles the question
+        // before taste is consulted.
+        var mine = RecommendationScorer.Score(Candidate(SciFi, community: 7.95), profile, GenreNames);
+        var better = RecommendationScorer.Score(Candidate(Horror, community: 8.39), profile, GenreNames);
+
+        Assert.True(
+            mine.Score > better.Score,
+            $"expected the on-taste film to win, got {mine.Score:0.000} against {better.Score:0.000}");
+    }
+
+    [Fact]
+    public void A_far_better_film_still_beats_a_mediocre_one_in_a_loved_genre()
+    {
+        var profile = SciFiFan();
+
+        // The other direction, and the failure this codebase has already shipped
+        // once: taste decides among good films, it does not excuse a weak one.
+        var weak = RecommendationScorer.Score(Candidate(SciFi, community: 6.6), profile, GenreNames);
+        var excellent = RecommendationScorer.Score(Candidate(Horror, community: 8.8), profile, GenreNames);
+
+        Assert.True(
+            excellent.Score > weak.Score,
+            $"expected the far better film to win, got {excellent.Score:0.000} against {weak.Score:0.000}");
+    }
+
+    [Theory]
+    [InlineData(6.4, false)]
+    [InlineData(6.5, true)]
+    public void Widening_the_scale_did_not_lower_the_floor(double rating, bool admissible)
+    {
+        var today = new DateOnly(2026, 9, 25);
+
+        // The scale and the floor were one constant until they were separated.
+        // If they ever merge again, widening the scale silently admits films the
+        // floor exists to refuse — which is the regression this whole balance was
+        // set to prevent.
+        Assert.Equal(
+            admissible,
+            RecommendationScorer.IsWorthRecommending(Candidate(SciFi, community: rating), today));
+    }
+
+    [Fact]
+    public void Two_outstanding_films_are_still_told_apart()
+    {
+        var profile = SciFiFan();
+
+        // The point of a ceiling above TMDb's practical maximum. At 8.5 both of
+        // these clamped to a perfect quality score and became indistinguishable,
+        // so the ranking between the two best films in a pool was decided by
+        // runtime and release year.
+        var great = RecommendationScorer.Score(Candidate(SciFi, community: 8.6), profile, GenreNames);
+        var greater = RecommendationScorer.Score(Candidate(SciFi, community: 9.2), profile, GenreNames);
+
+        Assert.True(
+            greater.Score > great.Score,
+            $"expected 9.2 to outrank 8.6, got {greater.Score:0.000} against {great.Score:0.000}");
+    }
+
+    [Fact]
+    public void A_film_at_the_floor_is_worth_more_than_nothing()
+    {
+        var profile = SciFiFan();
+
+        // Under the old scale the floor was also the scale's zero, so the worst
+        // admissible film scored exactly 0 on quality and could never be
+        // distinguished from one slightly worse.
+        var atFloor = RecommendationScorer.Score(Candidate(SciFi, community: 6.5), profile, GenreNames);
+        var justAbove = RecommendationScorer.Score(Candidate(SciFi, community: 7.0), profile, GenreNames);
+
+        Assert.NotNull(atFloor.Breakdown);
+        Assert.True(atFloor.Breakdown.Quality > 0);
+        Assert.True(justAbove.Score > atFloor.Score);
+    }
 }

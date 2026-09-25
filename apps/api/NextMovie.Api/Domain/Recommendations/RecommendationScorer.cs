@@ -100,15 +100,31 @@ public static class RecommendationScorer
     public const int MinimumVotes = 5_000;
 
     /// <summary>
-    /// The rating at which a film stops being merely watchable.
+    /// The rating the quality scale treats as worth nothing.
     /// </summary>
     /// <remarks>
-    /// Quality is measured across the range that actually separates films worth
-    /// recommending — roughly 6.5 to 8.5 — rather than across 0 to 10, where a
-    /// point of difference between a great film and a poor one shrinks to a tenth
-    /// of the scale and stops mattering.
+    /// <b>Not the floor.</b> These were one constant until offline evaluation
+    /// showed what that cost: <see cref="MinimumRating"/> decided both what was
+    /// admissible and where the scale began, so widening the scale meant lowering
+    /// the bar. They are separate now, and only this pair moves.
+    /// <para>
+    /// The scale ran 6.5–8.5, which made one TMDb point worth half the range —
+    /// more, weighted, than the taste term can contribute at its maximum. A film
+    /// rated 7.95 in the viewer's favourite genre lost to one rated 8.39 outside
+    /// it, every time, by margins as small as 0.002. Quality is still the largest
+    /// single weight; it simply no longer settles the question before taste is
+    /// consulted.
+    /// </para>
     /// </remarks>
-    private const double ExcellentRating = 8.5;
+    private const double WorthlessRating = 5.0;
+
+    /// <summary>The rating the quality scale treats as perfect.</summary>
+    /// <remarks>
+    /// Above TMDb's practical ceiling on purpose. Almost nothing rates above 8.7
+    /// with a real vote count, so this keeps the top of the scale from
+    /// compressing the films that actually compete.
+    /// </remarks>
+    private const double ExcellentRating = 9.5;
 
     /// <summary>
     /// The affinity above which a genre is worth naming as a reason.
@@ -246,17 +262,19 @@ public static class RecommendationScorer
     /// How good the film is, across the range that actually separates them.
     /// </summary>
     /// <remarks>
-    /// Stretched over <see cref="MinimumRating"/> to <see cref="ExcellentRating"/>
-    /// rather than 0–10. On the raw scale the difference between a 6.5 and an 8.5
-    /// is a fifth of the range and loses to almost anything else; here it is the
-    /// whole range, which is what makes quality decide.
+    /// Stretched over <see cref="WorthlessRating"/> to <see cref="ExcellentRating"/>
+    /// rather than 0–10, so a point of difference still means something — but no
+    /// longer over so narrow a band that a few tenths decide every ranking on
+    /// their own.
     /// </remarks>
     private static double CommunityScore(RecommendationCandidate candidate) =>
         candidate.CommunityRating is { } rating
-            ? Math.Clamp((rating - MinimumRating) / (ExcellentRating - MinimumRating), 0, 1)
+            ? Math.Clamp((rating - WorthlessRating) / (ExcellentRating - WorthlessRating), 0, 1)
 
             // No community verdict at all. Not zero, but well below anything with
-            // a real reputation.
+            // a real reputation. Unreachable through recommendations — the floor
+            // already refuses a film with no rating — and kept for callers that
+            // score a candidate without going through it.
             : 0.2;
 
     /// <summary>

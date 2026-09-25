@@ -136,6 +136,16 @@ internal static class Report
             {
                 text.AppendLine($"     lost:  {Race(race.LoserTitle, race.Loser)}");
                 text.AppendLine($"     beat:  {Race(race.WinnerTitle, race.Winner)}");
+
+                if (race.Loser.Score > race.Winner.Score)
+                {
+                    // Scores are not the last word. Diversification drops a film
+                    // whose genres already had their turn, and availability
+                    // nudges the order afterwards, so the better-scoring film can
+                    // still be the one left out. Said here because otherwise
+                    // these two lines look like an arithmetic bug.
+                    text.AppendLine("            (outscored it — dropped by diversification or availability)");
+                }
             }
         }
 
