@@ -341,4 +341,62 @@ public sealed class RecommendationScorerTests
 
         Assert.Equal(RecommendationConfidence.Low, recommendation.Confidence);
     }
+
+    // --- the score breakdown ---
+
+    /// <summary>
+    /// The breakdown must reconstruct the score it claims to explain.
+    /// </summary>
+    /// <remarks>
+    /// It is read to decide which weight is wrong. A breakdown that drifted from
+    /// the formula would send that decision somewhere the ranking never went, and
+    /// would look entirely authoritative while doing it.
+    /// </remarks>
+    [Theory]
+    [InlineData(8.4, 120, 2015)]
+    [InlineData(6.6, 200, 1974)]
+    [InlineData(9.0, 90, 2001)]
+    public void The_breakdown_adds_up_to_the_score(double rating, int runtime, int year)
+    {
+        var scored = RecommendationScorer.Score(
+            Candidate(SciFi, runtime, year, rating, votes: 40_000),
+            SciFiFan(),
+            GenreNames);
+
+        Assert.NotNull(scored.Breakdown);
+
+        var breakdown = scored.Breakdown;
+
+        var rebuilt =
+            breakdown.WeightedTaste
+            + breakdown.WeightedQuality
+            + breakdown.WeightedInteraction
+            + (breakdown.Runtime * RecommendationScorer.RuntimeWeight)
+            + (breakdown.Era * RecommendationScorer.EraWeight);
+
+        Assert.Equal(scored.Score, Math.Clamp(rebuilt, 0, 1), precision: 9);
+    }
+
+    [Fact]
+    public void The_interaction_is_taste_and_quality_multiplied()
+    {
+        var breakdown = new ScoreBreakdown(Taste: 0.8, Quality: 0.5, Runtime: 0.3, Era: 0.2);
+
+        // Multiplied, not added. It is the term that says "the good ones, from
+        // the kinds of film this person watches", and a sum would say something
+        // else entirely.
+        Assert.Equal(0.4, breakdown.Interaction, precision: 9);
+    }
+
+    [Fact]
+    public void Weighted_components_apply_their_own_weights()
+    {
+        var breakdown = new ScoreBreakdown(Taste: 1.0, Quality: 1.0, Runtime: 0, Era: 0);
+
+        // Reported weighted, because raw values invite comparing a taste of 0.31
+        // with a quality of 0.82 as though they were commensurable.
+        Assert.Equal(RecommendationScorer.TasteWeight, breakdown.WeightedTaste, precision: 9);
+        Assert.Equal(RecommendationScorer.QualityWeight, breakdown.WeightedQuality, precision: 9);
+        Assert.Equal(RecommendationScorer.InteractionWeight, breakdown.WeightedInteraction, precision: 9);
+    }
 }

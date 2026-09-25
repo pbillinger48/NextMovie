@@ -129,7 +129,6 @@ internal sealed class RecommendationEngine(
             .Where(entry => RecommendationScorer.IsWorthRecommending(entry.Candidate, today))
             .ToList();
 
-        trace?.Contending.AddRange(pool.Select(entry => entry.Candidate.GenreIds));
 
         // Worked out across the pool, so a genre shared by every candidate stops
         // deciding between them.
@@ -142,6 +141,15 @@ internal sealed class RecommendationEngine(
                 RecommendationScorer.Score(entry.Candidate, profile, genreNames, informativeness)))
             .OrderByDescending(entry => entry.Scored.Score)
             .ToList();
+
+        // Recorded after scoring rather than after the floor, so the trace can
+        // say why a film lost and not only that it was there.
+        trace?.Contending.AddRange(scored.Select(entry => new ContendingFilm(
+            entry.Movie.Id,
+            entry.Movie.Title,
+            [.. entry.Movie.Genres.Select(genre => genre.Id)],
+            entry.Scored.Score,
+            entry.Scored.Breakdown)));
 
         // Availability is looked up only for the films with a chance of being
         // shown. Asking about a hundred candidates to display twelve would be a

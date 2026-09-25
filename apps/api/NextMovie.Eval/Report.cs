@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using NextMovie.Api.Features.Recommendations;
 
 namespace NextMovie.Eval;
 
@@ -130,6 +131,12 @@ internal static class Report
             // and a list of films can. Every real fault in this project was found
             // by reading output, not by reading a number.
             text.AppendLine($"     {string.Join("  ·  ", cohort.Titles.Take(3).Select(title => Truncate(title, 24)))}");
+
+            if (cohort.PassedOver is { } race)
+            {
+                text.AppendLine($"     lost:  {Race(race.LoserTitle, race.Loser)}");
+                text.AppendLine($"     beat:  {Race(race.WinnerTitle, race.Winner)}");
+            }
         }
 
         if (report.UniversalTitles.Count > 0)
@@ -179,6 +186,22 @@ internal static class Report
         >= 0.3 => "← partly personalised",
         _ => "← the lists genuinely differ",
     };
+
+    /// <remarks>
+    /// Weighted contributions, not raw component values. Raw values invite the
+    /// reader to compare a taste of 0.31 with a quality of 0.82 as though the two
+    /// were commensurable, and they are not — one is worth three times the other
+    /// before either is compared.
+    /// </remarks>
+    private static string Race(string title, ContendingFilm film)
+    {
+        var parts = film.Breakdown is { } breakdown
+            ? $"taste {breakdown.WeightedTaste:0.000}  quality {breakdown.WeightedQuality:0.000}  "
+              + $"interaction {breakdown.WeightedInteraction:0.000}"
+            : "no breakdown";
+
+        return $"{Truncate(title, 28),-28} {film.Score:0.000}   {parts}";
+    }
 
     private static string Line(string label, string value) => $"  {label,-16} {value}";
 

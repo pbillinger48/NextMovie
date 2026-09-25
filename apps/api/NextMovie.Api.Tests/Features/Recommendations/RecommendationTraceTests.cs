@@ -87,7 +87,30 @@ public sealed class RecommendationTraceTests(PostgresFixture postgres) : IAsyncL
         // The evaluator counts genre membership across this to decide whether a
         // taste was outranked or never sourced. Empty genre lists would report
         // "none of the pool was on taste" for every taste there is.
-        Assert.All(trace.Contending, genres => Assert.Contains(SciFiGenre, genres));
+        Assert.All(trace.Contending, film => Assert.Contains(SciFiGenre, film.GenreIds));
+    }
+
+    [Fact]
+    public async Task Every_contending_film_carries_the_score_it_lost_or_won_with()
+    {
+        var userId = await SignedInWithHistoryAsync();
+        var trace = new RecommendationTrace();
+
+        await RecommendAsync(userId, count: 3, trace);
+
+        // Without the components, the only possible next step after "ten musicals
+        // competed and none were shown" is a guess about which weight is wrong.
+        Assert.All(trace.Contending, film =>
+        {
+            Assert.InRange(film.Score, 0, 1);
+            Assert.NotNull(film.Breakdown);
+        });
+
+        // Recorded in the order they were ranked, which is what makes "the best
+        // one that lost" a meaningful thing to ask for.
+        Assert.Equal(
+            trace.Contending.Select(film => film.Score).OrderByDescending(score => score),
+            trace.Contending.Select(film => film.Score));
     }
 
     [Fact]
