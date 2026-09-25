@@ -84,6 +84,31 @@ reached.
 - The engine leans harder on TMDb's community rating as a proxy for quality. It is
   a decent one, and it is one number produced by a population with its own tastes.
 
+## Amendment, 2026-09-25: the floor and the scale are not the same number
+
+This ADR's floor and the scale quality is measured on were one constant, 6.5.
+That conflation had a cost nobody could see until there was a way to measure it.
+
+Because the scale ran 6.5 to 8.5, **one TMDb point was worth half the range** —
+0.225 weighted, more than the taste term contributes at its absolute maximum. A
+film rated 7.95 in the genre somebody seeks out lost to one rated 8.39 in a genre
+they avoid, every time, by margins as small as 0.002. Offline evaluation
+(ADR-0012) showed four such races in a row, and a reader built entirely from
+musicals being offered none.
+
+The two are now separate constants. **The floor is unchanged at 6.5** and still
+refuses everything below it; only the scale moved, to 5.0–9.5. Quality remains
+the largest single weight — it simply no longer settles the question before taste
+is consulted.
+
+Measured on a real 786-film library: films carrying the reader's own taste rose
+from 29% to 33%, median TMDb rating held at 8.4, floor breaches stayed at zero,
+and recall returned to its pre-change level.
+
+The wider ceiling matters separately: at 8.5 anything better clamped to a perfect
+score, so the two best films in a pool were ranked against each other by runtime
+and release year.
+
 ## Alternatives considered
 
 **Reweighting without a floor**
