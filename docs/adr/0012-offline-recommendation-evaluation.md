@@ -133,6 +133,13 @@ The second measure exists because the first was not enough. Overlap came back at
 was offered **no musicals at all**. Distinctness is not relevance, and only
 reading the actual titles made that visible.
 
+Each taste also reports its **sourcing chain**: whether the genre was queried at
+all, and how many of its films survived the quality floor to compete for a slot.
+Added after the first fix landed, because "not recommended" has two causes that
+look identical from outside — never fetched, or fetched and outranked — and only
+the first is a ceiling nothing downstream can lift. Inferring which from twelve
+film titles produced the wrong answer twice.
+
 **Unlike hold-out, this mode is not reproducible to the decimal.** Candidates are
 fetched live and the run is rolled back, so nothing is cached between runs and
 the figures move by a few points. Read it for its magnitude, not its precision.

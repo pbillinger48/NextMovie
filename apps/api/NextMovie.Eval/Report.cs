@@ -113,9 +113,17 @@ internal static class Report
 
         foreach (var cohort in report.Cohorts)
         {
+            // The sourcing chain, because "not recommended" has two completely
+            // different causes and only this tells them apart: a genre never
+            // queried is a ceiling nothing downstream can lift, while candidates
+            // that competed and lost are a ranking decision a weight could change.
+            var sourcing = cohort.Queried
+                ? $"queried, {cohort.Contending,3} of {cohort.PoolSize,3} competed"
+                : $"NOT QUERIED{new string(' ', 14)}";
+
             text.AppendLine(
                 $"   {Truncate(cohort.Taste, 16),-16} from {cohort.Library,3} films   "
-                + $"{cohort.OnTaste,2}/{cohort.Films.Count,-2} on taste   "
+                + $"{sourcing}   {cohort.OnTaste,2}/{cohort.Films.Count,-2} shown   "
                 + $"{cohort.SharedWithOthers,2}/{cohort.Films.Count,-2} shared");
 
             // The top few by name, because a coefficient cannot be sanity-checked
