@@ -65,10 +65,20 @@ internal sealed class RecommendationEngine(
     private const decimal SeedThreshold = 4.0m;
 
     /// <summary>Builds a ranked list, and records what was served.</summary>
+    /// <param name="userId">Who to recommend for.</param>
+    /// <param name="count">How many films to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="trace">
+    /// Optional. When supplied, records how the candidate pool was assembled —
+    /// for the offline evaluator, which cannot otherwise tell a film that was
+    /// never fetched from one that was fetched and outranked. Nothing about the
+    /// result depends on it.
+    /// </param>
     public async Task<IReadOnlyList<Recommendation>> RecommendAsync(
         Guid userId,
         int count,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        RecommendationTrace? trace = null)
     {
         var profile = await BuildProfileAsync(userId, cancellationToken);
         var seeds = await SeedsAsync(userId, profile, cancellationToken);
@@ -83,8 +93,15 @@ internal sealed class RecommendationEngine(
             return [];
         }
 
-        var candidates = await CandidatesAsync(seeds, profile, cancellationToken);
+        var candidates = await CandidatesAsync(seeds, profile, cancellationToken, trace);
         var excluded = await SeenFilmsAsync(userId, cancellationToken);
+
+        if (trace is not null)
+        {
+            trace.SeedTmdbIds.AddRange(seeds);
+            trace.Fetched = candidates.Count;
+            trace.Unseen = candidates.Count(film => !excluded.Contains(film.Movie.Id));
+        }
 
         var genreNames = await db.Genres
             .AsNoTracking()
@@ -111,6 +128,8 @@ internal sealed class RecommendationEngine(
             // this cannot. Returning six good films beats twelve with duds in it.
             .Where(entry => RecommendationScorer.IsWorthRecommending(entry.Candidate, today))
             .ToList();
+
+        trace?.Contending.AddRange(pool.Select(entry => entry.Candidate.GenreIds));
 
         // Worked out across the pool, so a genre shared by every candidate stops
         // deciding between them.
@@ -259,7 +278,8 @@ internal sealed class RecommendationEngine(
     private async Task<List<MovieWithGenres>> CandidatesAsync(
         IReadOnlyList<int> seeds,
         TasteProfile profile,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        RecommendationTrace? trace)
     {
         var mapped = new Dictionary<int, MappedMovie>();
 
@@ -280,7 +300,10 @@ internal sealed class RecommendationEngine(
         // watched, most of that answer is films they have already seen. One real
         // library's entire candidate pool contained a single unwatched film rated
         // above 8. This asks the question a recommendation is actually for.
-        foreach (var genreId in GenreSelection.ForDiscovery(profile))
+        var discovering = GenreSelection.ForDiscovery(profile);
+        trace?.DiscoveryGenres.AddRange(discovering);
+
+        foreach (var genreId in discovering)
         {
             await CollectAsync(
                 mapped,

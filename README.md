@@ -281,6 +281,19 @@ dotnet run --project apps/api/NextMovie.Eval -- \
 Without `--tastes` it takes the largest genres, which is the *weakest* version of
 the test — the biggest genres share the most films with each other.
 
+Each taste also reports its **sourcing chain** — whether TMDb was asked for that
+genre at all, and how many of its films survived the quality floor to compete:
+
+```
+War    from   8 films   queried,  16 of  72 competed    5/12 shown
+Music  from   7 films   queried,  10 of  66 competed    0/12 shown
+```
+
+That distinction decides what to fix. A genre never queried is a ceiling nothing
+downstream can lift; films that competed and lost are a ranking decision a weight
+could change. Reading twelve titles cannot tell them apart, and guessing wrong
+costs a branch.
+
 This mode is **not** reproducible to the decimal: candidates are fetched live and
 the run is rolled back, so nothing is cached and the figures move a few points
 between runs.

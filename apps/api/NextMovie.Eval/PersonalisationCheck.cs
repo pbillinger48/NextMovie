@@ -14,6 +14,12 @@ namespace NextMovie.Eval;
 /// <param name="Titles">What came back, in rank order.</param>
 /// <param name="Films">The same list as a set, for comparing.</param>
 /// <param name="SharedWithOthers">How many of its films another cohort also got.</param>
+/// <param name="Queried">Whether TMDb was asked for the best films of this taste at all.</param>
+/// <param name="Contending">
+/// Candidates carrying this taste that survived the quality floor — the films that
+/// actually competed for a slot.
+/// </param>
+/// <param name="PoolSize">How many films competed in total.</param>
 /// <param name="OnTaste">
 /// How many carry the genre the reader was built from. Overlap can only say that
 /// two lists differ; this says whether a list is <em>about</em> the reader it was
@@ -25,7 +31,10 @@ internal sealed record Cohort(
     IReadOnlyList<string> Titles,
     IReadOnlySet<Guid> Films,
     int SharedWithOthers,
-    int OnTaste);
+    int OnTaste,
+    bool Queried,
+    int Contending,
+    int PoolSize);
 
 /// <summary>What the personalisation check found.</summary>
 /// <param name="Cohorts">One per taste.</param>
@@ -148,19 +157,26 @@ internal sealed class PersonalisationCheck(
             return null;
         }
 
+        var genreIds = await db.Genres
+            .AsNoTracking()
+            .ToDictionaryAsync(genre => genre.Name, genre => genre.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
         var started = TimeProvider.System.GetTimestamp();
-        var results = new List<(string Taste, int Library, IReadOnlyList<Recommendation> Films)>();
+        var results = new List<(string Taste, int Library, IReadOnlyList<Recommendation> Films, RecommendationTrace Trace)>();
 
         foreach (var (taste, films) in tastes)
         {
-            var recommendations = await ForTasteAsync(taste, films, options.Count, cancellationToken);
+            var trace = new RecommendationTrace();
+            var recommendations = await ForTasteAsync(taste, films, options.Count, trace, cancellationToken);
 
-            results.Add((taste, films.Count, recommendations));
+            results.Add((taste, films.Count, recommendations, trace));
 
             logger.LogInformation(
-                "{Taste}: built from {Library} films, offered {Offered}",
+                "{Taste}: built from {Library} films, {Fetched} fetched, {Pool} competing, offered {Offered}",
                 taste,
                 films.Count,
+                trace.Fetched,
+                trace.Contending.Count,
                 recommendations.Count);
         }
 
@@ -197,7 +213,13 @@ internal sealed class PersonalisationCheck(
                     lists[index],
                     OverlapMetrics.SharedWithAny(lists[index], lists),
                     result.Films.Count(film => film.Movie.Genres.Any(genre =>
-                        string.Equals(genre.Name, result.Taste, StringComparison.OrdinalIgnoreCase))))),
+                        string.Equals(genre.Name, result.Taste, StringComparison.OrdinalIgnoreCase))),
+                    Queried: genreIds.TryGetValue(result.Taste, out var id)
+                        && result.Trace.DiscoveryGenres.Contains(id),
+                    Contending: genreIds.TryGetValue(result.Taste, out var contendingId)
+                        ? result.Trace.Contending.Count(genres => genres.Contains(contendingId))
+                        : 0,
+                    PoolSize: result.Trace.Contending.Count)),
             ],
             Overlap: overlap,
             Head: head,
@@ -253,6 +275,7 @@ internal sealed class PersonalisationCheck(
         string taste,
         IReadOnlyList<Guid> library,
         int count,
+        RecommendationTrace trace,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -295,7 +318,7 @@ internal sealed class PersonalisationCheck(
             await db.SaveChangesAsync(cancellationToken);
             db.ChangeTracker.Clear();
 
-            return await engine.RecommendAsync(reader.Id, count, cancellationToken);
+            return await engine.RecommendAsync(reader.Id, count, cancellationToken, trace);
         }
         finally
         {
