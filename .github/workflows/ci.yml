@@ -76,6 +76,39 @@ jobs:
       - name: Build
         run: pnpm build
 
+  # The same reasoning as the contract job below, applied to infrastructure:
+  # without this, "the Terraform is valid" is something somebody remembers to
+  # check. Neither step needs Azure credentials — validate resolves the provider
+  # schema, it does not reach the API — so this runs on every pull request like
+  # everything else.
+  infrastructure:
+    name: Infrastructure (Terraform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.3
+          # The wrapper rewrites stdout, which turns a readable fmt diff into
+          # noise.
+          terraform_wrapper: false
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive infra
+
+      - name: Validate the environment
+        working-directory: infra
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+      - name: Validate the state backend
+        working-directory: infra/bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
   # ADR-0002's enforcement. Without this job, "generate the TypeScript from the
   # schema" is a convention someone can forget; with it, a backend change that
   # alters the contract cannot merge unless the schema and client are regenerated

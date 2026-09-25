@@ -77,3 +77,12 @@ artifacts/
 # ---------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
+
+# Terraform: local state, provider binaries, and any variable file that might
+# hold a real value.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

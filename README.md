@@ -316,6 +316,7 @@ apps/
   web/          Next.js web application
   api/          ASP.NET Core API, its tests, and the offline evaluator
   mobile/       Expo app (planned)
+infra/          Azure environment, in Terraform (ADR-0013)
 packages/
   api-client/   OpenAPI document + generated TypeScript client
 docs/
