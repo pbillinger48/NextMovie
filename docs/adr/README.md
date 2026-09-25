@@ -30,6 +30,7 @@ Where an ADR and `docs/` disagree, **the ADR wins** — the product docs predate
 | [0010](0010-streaming-availability.md) | Streaming availability, per region, cached daily | Accepted |
 | [0011](0011-recommendation-responses.md) | Recommendation responses, and the watchlist as one of them | Accepted |
 | [0012](0012-offline-recommendation-evaluation.md) | Evaluate recommendations offline, against a held-out library | Accepted |
+| [0013](0013-deploy-to-azure-with-terraform.md) | Deploy to Azure App Service, described in Terraform | Accepted |
 
 ## Template
 
