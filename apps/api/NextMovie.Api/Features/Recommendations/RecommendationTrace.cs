@@ -1,3 +1,5 @@
+using NextMovie.Api.Domain.Recommendations;
+
 namespace NextMovie.Api.Features.Recommendations;
 
 /// <summary>
@@ -30,12 +32,30 @@ internal sealed class RecommendationTrace
     public int Unseen { get; set; }
 
     /// <summary>
-    /// The genres of every candidate that survived the quality floor, one entry
-    /// per film.
+    /// Every candidate that survived the quality floor, with what it scored.
     /// </summary>
     /// <remarks>
     /// The pool that actually competed. Comparing it against the final list is
-    /// what separates "never sourced" from "sourced and beaten".
+    /// what separates "never sourced" from "sourced and beaten", and the score
+    /// components then say <em>why</em> it was beaten — which is the difference
+    /// between knowing a weight is wrong and guessing which one.
     /// </remarks>
-    public List<IReadOnlyList<int>> Contending { get; } = [];
+    public List<ContendingFilm> Contending { get; } = [];
 }
+
+/// <summary>One film that competed for a slot, and how it fared.</summary>
+/// <param name="MovieId">The film.</param>
+/// <param name="Title">
+/// Carried here rather than looked up later. A caller evaluating a hypothetical
+/// reader rolls its whole run back, so by the time anything reads this the film's
+/// row may no longer exist.
+/// </param>
+/// <param name="GenreIds">Its genres, for asking whether a taste was represented.</param>
+/// <param name="Score">Its final score, before any availability adjustment.</param>
+/// <param name="Breakdown">What each signal contributed, before weighting.</param>
+internal sealed record ContendingFilm(
+    Guid MovieId,
+    string Title,
+    IReadOnlyList<int> GenreIds,
+    double Score,
+    ScoreBreakdown? Breakdown);

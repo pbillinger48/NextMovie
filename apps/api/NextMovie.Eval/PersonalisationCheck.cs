@@ -20,6 +20,11 @@ namespace NextMovie.Eval;
 /// actually competed for a slot.
 /// </param>
 /// <param name="PoolSize">How many films competed in total.</param>
+/// <param name="PassedOver">
+/// The best-scoring film of this taste that did not make the list, against the
+/// weakest that did. Null when the taste had nothing in the pool, or when nothing
+/// of it was passed over.
+/// </param>
 /// <param name="OnTaste">
 /// How many carry the genre the reader was built from. Overlap can only say that
 /// two lists differ; this says whether a list is <em>about</em> the reader it was
@@ -34,7 +39,19 @@ internal sealed record Cohort(
     int OnTaste,
     bool Queried,
     int Contending,
-    int PoolSize);
+    int PoolSize,
+    LostRace? PassedOver);
+
+/// <summary>Why a film of the reader's own taste lost its place.</summary>
+/// <param name="LoserTitle">The best on-taste film that was left out.</param>
+/// <param name="Loser">What it scored.</param>
+/// <param name="WinnerTitle">The weakest film that made the list instead.</param>
+/// <param name="Winner">What that scored.</param>
+internal sealed record LostRace(
+    string LoserTitle,
+    ContendingFilm Loser,
+    string WinnerTitle,
+    ContendingFilm Winner);
 
 /// <summary>What the personalisation check found.</summary>
 /// <param name="Cohorts">One per taste.</param>
@@ -198,10 +215,13 @@ internal sealed class PersonalisationCheck(
 
         var head = OverlapMetrics.Compare(heads);
 
+        // Titles come from the trace, not the database. Every cohort's run is
+        // rolled back, so the films that competed no longer have rows by the time
+        // this assembles a report about them.
         var titles = results
-            .SelectMany(result => result.Films)
-            .DistinctBy(film => film.Movie.Id)
-            .ToDictionary(film => film.Movie.Id, film => film.Movie.Title);
+            .SelectMany(result => result.Trace.Contending)
+            .DistinctBy(film => film.MovieId)
+            .ToDictionary(film => film.MovieId, film => film.Title);
 
         return new PersonalisationReport(
             Cohorts:
@@ -217,15 +237,49 @@ internal sealed class PersonalisationCheck(
                     Queried: genreIds.TryGetValue(result.Taste, out var id)
                         && result.Trace.DiscoveryGenres.Contains(id),
                     Contending: genreIds.TryGetValue(result.Taste, out var contendingId)
-                        ? result.Trace.Contending.Count(genres => genres.Contains(contendingId))
+                        ? result.Trace.Contending.Count(film => film.GenreIds.Contains(contendingId))
                         : 0,
-                    PoolSize: result.Trace.Contending.Count)),
+                    PoolSize: result.Trace.Contending.Count,
+                    PassedOver: PassedOver(result.Trace, result.Films, genreIds, result.Taste))),
             ],
             Overlap: overlap,
             Head: head,
             HeadSize: HeadSize,
             UniversalTitles: [.. overlap.Universal.Select(film => titles.GetValueOrDefault(film, "?")).Order()],
             Elapsed: TimeProvider.System.GetElapsedTime(started));
+    }
+
+    /// <summary>
+    /// The closest thing to a direct answer this tool can give: the best film of
+    /// the reader's own taste that lost, and the weakest that beat it.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately the <em>weakest</em> winner rather than the strongest. The
+    /// question worth answering is what the losing film failed to clear, and the
+    /// top of the list is nowhere near that bar.
+    /// </remarks>
+    private static LostRace? PassedOver(
+        RecommendationTrace trace,
+        IReadOnlyList<Recommendation> shown,
+        IReadOnlyDictionary<string, int> genreIds,
+        string taste)
+    {
+        if (!genreIds.TryGetValue(taste, out var genreId))
+        {
+            return null;
+        }
+
+        var made = shown.Select(film => film.Movie.Id).ToHashSet();
+
+        // Contending is in rank order, so the first match is the best.
+        var loser = trace.Contending.FirstOrDefault(film =>
+            film.GenreIds.Contains(genreId) && !made.Contains(film.MovieId));
+
+        var winner = trace.Contending.LastOrDefault(film => made.Contains(film.MovieId));
+
+        return loser is null || winner is null
+            ? null
+            : new LostRace(loser.Title, loser, winner.Title, winner);
     }
 
     /// <summary>The source user's loved films, grouped by genre.</summary>

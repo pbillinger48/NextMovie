@@ -294,6 +294,17 @@ downstream can lift; films that competed and lost are a ranking decision a weigh
 could change. Reading twelve titles cannot tell them apart, and guessing wrong
 costs a branch.
 
+When something of the reader's own taste was passed over, the report also shows
+the race it lost, weighted component by weighted component:
+
+```
+lost:  Bohemian Rhapsody       0.707   taste 0.116  quality 0.326  interaction 0.168
+beat:  The Empire Strikes Back 0.719   taste 0.071  quality 0.426  interaction 0.135
+```
+
+Components are shown **weighted**, because raw values invite comparing a taste of
+0.31 against a quality of 0.82 as though the two were commensurable.
+
 This mode is **not** reproducible to the decimal: candidates are fetched live and
 the run is rolled back, so nothing is cached and the figures move a few points
 between runs.

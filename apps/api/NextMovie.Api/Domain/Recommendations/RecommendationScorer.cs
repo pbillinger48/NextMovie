@@ -154,7 +154,10 @@ public static class RecommendationScorer
             candidate.MovieId,
             Math.Clamp(score, 0, 1),
             Reasons(candidate, profile, genreNames, runtime, era),
-            ConfidenceFor(profile, candidate));
+            ConfidenceFor(profile, candidate))
+        {
+            Breakdown = new ScoreBreakdown(taste, quality, runtime, era),
+        };
     }
 
     /// <summary>
@@ -415,7 +418,49 @@ public sealed record ScoredRecommendation(
     Guid MovieId,
     double Score,
     IReadOnlyList<string> Reasons,
-    RecommendationConfidence Confidence);
+    RecommendationConfidence Confidence)
+{
+    /// <summary>
+    /// What each signal was worth before weighting, when the caller asked to know.
+    /// </summary>
+    /// <remarks>
+    /// An init-only property rather than a positional member so that adding it
+    /// did not rewrite every call site and every test that builds one of these.
+    /// <para>
+    /// Diagnostic only. Nothing in the ranking reads it — the score is already
+    /// computed by the time this is attached.
+    /// </para>
+    /// </remarks>
+    public ScoreBreakdown? Breakdown { get; init; }
+}
+
+/// <summary>
+/// What each signal contributed to a score, before its weight was applied.
+/// </summary>
+/// <remarks>
+/// Exists because "this film scored 0.62" cannot be acted on and "its taste term
+/// was 0.31 against the winner's 0.44" can. Offline evaluation found a pool
+/// containing ten musicals from which none were recommended; without the
+/// components, the next step after that finding is a guess.
+/// </remarks>
+/// <param name="Taste">How much this is the person's kind of film, 0–1.</param>
+/// <param name="Quality">How good the wider audience thinks it is, 0–1.</param>
+/// <param name="Runtime">How well the length matches what they finish, 0–1.</param>
+/// <param name="Era">How well the year matches what they watch, 0–1.</param>
+public sealed record ScoreBreakdown(double Taste, double Quality, double Runtime, double Era)
+{
+    /// <summary>Quality and taste multiplied — the term carrying the most weight.</summary>
+    public double Interaction => Taste * Quality;
+
+    /// <summary>What this signal is worth once weighted.</summary>
+    public double WeightedTaste => Taste * RecommendationScorer.TasteWeight;
+
+    /// <inheritdoc cref="WeightedTaste"/>
+    public double WeightedQuality => Quality * RecommendationScorer.QualityWeight;
+
+    /// <inheritdoc cref="WeightedTaste"/>
+    public double WeightedInteraction => Interaction * RecommendationScorer.InteractionWeight;
+}
 
 /// <summary>How much the engine trusts its own recommendation.</summary>
 public enum RecommendationConfidence
